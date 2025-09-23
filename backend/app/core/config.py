@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     MINIO_SECRET_KEY: str = Field(default="minioadmin")
     MINIO_BUCKET: str = Field(default="rag-data")
 
+    EMBEDDING_MODEL_NAME: str = Field(default="sentence-transformers/all-MiniLM-L6-v2")
+    EMBEDDING_DIM: int = Field(default=1536)
+
     OIDC_CLIENT_ID: str = Field(default="client-id")
     OIDC_CLIENT_SECRET: str = Field(default="client-secret")
     OIDC_ISSUER: str = Field(default="https://example.com/oidc")

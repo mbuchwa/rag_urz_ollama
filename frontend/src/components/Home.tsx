@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../context/AuthContext'
 import logo from '/imgs/logo.png'
@@ -8,6 +8,8 @@ import ResponseDisplay from './ResponseDisplay'
 import ThinkingSidebar from './ThinkingSidebar'
 import Navbar from './Navbar'
 import { ErrorBoundary } from './ErrorBoundary'
+import Upload from './Upload'
+import Library, { type DocumentRecord } from './Library'
 
 const THINKING_ENABLED = import.meta.env.VITE_ENABLE_MODEL_THINKING === 'true'
 
@@ -24,54 +26,116 @@ interface Message {
 }
 
 export default function Home() {
-  const { csrfToken } = useAuth()
+  const { csrfToken, namespaces } = useAuth()
+  const namespace = useMemo(() => namespaces[0] ?? null, [namespaces])
+  const [activeTab, setActiveTab] = useState<'chat' | 'library'>('chat')
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [think, setThink] = useState('')
   const [showThinking, setShowThinking] = useState(false)
+  const [documents, setDocuments] = useState<DocumentRecord[]>([])
+  const [docsLoading, setDocsLoading] = useState(false)
 
-  const handleSend = async (text: string) => {
-    if (!text) return
-    setMessages((m) => [...m, { sender: 'user', text }])
-    setLoading(true)
+  const fetchDocuments = useCallback(async () => {
+    if (!namespace) {
+      setDocuments([])
+      return
+    }
+    setDocsLoading(true)
     try {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
+      const res = await fetch(`/api/docs?namespace_id=${namespace.id}`, { credentials: 'include' })
+      if (!res.ok) {
+        throw new Error(`Failed to load documents (${res.status})`)
       }
-      if (csrfToken) {
-        headers['X-CSRF-Token'] = csrfToken
-      }
+      const data = await res.json()
+      const rawDocs = Array.isArray(data.documents) ? data.documents : []
+      const mapped: DocumentRecord[] = rawDocs
+        .map((doc: any) => {
+          const chunkCountNumeric = Number(doc.chunk_count)
+          const metadata = typeof doc?.metadata === 'object' && doc.metadata !== null ? doc.metadata : null
+          return {
+            id: String(doc.id ?? ''),
+            title: typeof doc.title === 'string' ? doc.title : null,
+            status: typeof doc.status === 'string' ? doc.status : 'uploaded',
+            contentType: typeof doc.content_type === 'string' ? doc.content_type : 'application/octet-stream',
+            createdAt: typeof doc.created_at === 'string' ? doc.created_at : new Date().toISOString(),
+            updatedAt: typeof doc.updated_at === 'string' ? doc.updated_at : null,
+            error: typeof doc.error === 'string' ? doc.error : null,
+            chunkCount: Number.isFinite(chunkCountNumeric) ? chunkCountNumeric : 0,
+            metadata,
+          }
+        })
+        .filter((doc) => doc.id)
+      setDocuments(mapped)
+    } catch (error) {
+      console.error('Failed to load documents', error)
+    } finally {
+      setDocsLoading(false)
+    }
+  }, [namespace])
 
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify({ message: text }),
-      })
-      if (!res.body) throw new Error('No response body')
+  useEffect(() => {
+    if (activeTab !== 'library') return
+    if (!namespace) {
+      setDocuments([])
+      return
+    }
+    void fetchDocuments()
+    const interval = window.setInterval(() => {
+      void fetchDocuments()
+    }, 5000)
+    return () => window.clearInterval(interval)
+  }, [activeTab, namespace, fetchDocuments])
 
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      setMessages((m) => [...m, { sender: 'bot', text: '' }])
+  useEffect(() => {
+    if (activeTab !== 'chat') {
+      setShowThinking(false)
+    }
+  }, [activeTab])
 
-      let answer = ''
-      let buffer = ''
-      let live = true
-      let lastTick = Date.now()
-      const tick = () => Date.now() - lastTick < 30000
+  const handleSend = useCallback(
+    async (text: string) => {
+      if (!text) return
+      setMessages((m) => [...m, { sender: 'user', text }])
+      setLoading(true)
+      try {
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+        }
+        if (csrfToken) {
+          headers['X-CSRF-Token'] = csrfToken
+        }
 
-      while (live) {
-        const { value, done } = await reader.read()
-        if (done) break
-        lastTick = Date.now()
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify({ message: text }),
+        })
+        if (!res.body) throw new Error('No response body')
 
-        buffer += decoder.decode(value, { stream: true })
-        let idx: number
-        while ((idx = buffer.indexOf('\n\n')) !== -1) {
-          const frame = buffer.slice(0, idx).trim()
-          buffer = buffer.slice(idx + 2)
-          if (!frame.startsWith('data:')) continue
-          const payload = JSON.parse(frame.slice(5).trim())
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        setMessages((m) => [...m, { sender: 'bot', text: '' }])
+
+        let answer = ''
+        let buffer = ''
+        let live = true
+        let lastTick = Date.now()
+        const tick = () => Date.now() - lastTick < 30000
+
+        while (live) {
+          const { value, done } = await reader.read()
+          if (done) break
+          lastTick = Date.now()
+
+          buffer += decoder.decode(value, { stream: true })
+          let idx: number
+          while ((idx = buffer.indexOf('\n\n')) !== -1) {
+            const frame = buffer.slice(0, idx).trim()
+            buffer = buffer.slice(idx + 2)
+            if (!frame.startsWith('data:')) continue
+            const payload = JSON.parse(frame.slice(5).trim())
 
           if (payload.token) {
             answer += payload.token
@@ -109,104 +173,160 @@ export default function Home() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [csrfToken])
 
-  const hasConversation = messages.length > 0
+  const handleDelete = useCallback(
+    async (id: string) => {
+      if (!csrfToken) {
+        console.warn('Missing CSRF token for deletion')
+        return
+      }
+      try {
+        const res = await fetch(`/api/docs/${id}`, {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken,
+          },
+          body: '{}',
+        })
+        if (!res.ok) {
+          throw new Error(`Failed to delete document (${res.status})`)
+        }
+        await fetchDocuments()
+      } catch (error) {
+        console.error('Failed to delete document', error)
+      }
+    },
+    [csrfToken, fetchDocuments],
+  )
+
+  const handleRefresh = useCallback(() => {
+    void fetchDocuments()
+  }, [fetchDocuments])
+
+  const handleUploadComplete = useCallback(() => {
+    void fetchDocuments()
+  }, [fetchDocuments])
+
+  const hasConversation = activeTab === 'chat' && messages.length > 0
 
   return (
     <div className="flex min-h-screen flex-col items-center pt-8 text-gray-800">
       <Navbar />
-      {/* Header */}
-      <header className="flex flex-col items-center gap-2 mb-6 bg-white px-6 py-4 rounded shadow">
+      <header className="mb-6 flex flex-col items-center gap-2 rounded bg-white px-6 py-4 shadow">
         <div className="flex items-center gap-4">
           <img src={logo} alt="Heidelberg University" className="h-20" />
           <img src={chatbotLogo} alt="Chatbot Logo" className="h-20" />
         </div>
-        <h1 className="text-2xl font-semibold text-center">
+        <h1 className="text-center text-2xl font-semibold">
           IT Chatbot of the Computing Centre of Heidelberg University
         </h1>
       </header>
 
-      <div
-        className={`chat-container ${THINKING_ENABLED && showThinking ? 'sidebar-open' : ''} w-full sm:max-w-xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto px-4`}
-      >
-        {/* Chat panel after first prompt */}
-        {hasConversation && (
-          <div className="chat-panel flex flex-col h-[70vh] shadow-lg bg-white rounded-xl w-full mb-4">
-            <ErrorBoundary>
-              <ResponseDisplay
-                messages={messages}
-                loading={loading}
-                onSelectThinking={(t) => {
-                  if (THINKING_ENABLED) {
-                    setThink(t)
-                    setShowThinking(true)
-                  }
-                }}
-                thinkingEnabled={THINKING_ENABLED}
-              />
-            </ErrorBoundary>
-          </div>
-        )}
-
-        {/* PRE-CHAT • put everything on a soft card for contrast */}
-        {!hasConversation && (
-          <section className="w-full mb-4">
-            <div className="mx-auto max-w-2xl rounded-2xl bg-white/85 backdrop-blur p-6 shadow-lg">
-              {/* Model name */}
-              <div className="text-center text-lg font-bold text-gray-600 mb-4">
-                Modell: gpt-oss-20b
-              </div>
-
-              {/* Vorgeschlagen header */}
-              <div className="flex items-center gap-2 text-gray-500 mb-3">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-yellow-500">
-                  <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />
-                </svg>
-                <span className="font-medium">Vorgeschlagen</span>
-              </div>
-
-              {/* Example prompts in brand red */}
-              <div className="space-y-3">
-                {EXAMPLE_PROMPTS.map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => handleSend(p)}
-                    className="w-full p-4 text-left rounded-xl shadow ring-1 ring-[#b52230]/30 bg-[#b52230] text-white hover:bg-[#9f1e2a] transition"
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-
-              {/* Query bar INSIDE the card pre-chat for cohesion */}
-              <div className="mt-4">
-                <QueryInterface
-                  onSend={handleSend}
-                  placeholder="Wie kann ich Dir helfen?"
-                  autoFocus
-                />
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* After chat starts, keep the query bar anchored under the chat panel */}
-        {hasConversation && (
-          <QueryInterface
-            onSend={handleSend}
-            placeholder="Weiter fragen …"
-            autoFocus={false}
-          />
-        )}
-
-        {THINKING_ENABLED && showThinking && <ThinkingSidebar think={think} />}
+      <div className="mb-6 flex gap-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab('chat')}
+          className={`rounded-full px-5 py-2 text-sm font-medium transition ${
+            activeTab === 'chat'
+              ? 'bg-[#b52230] text-white shadow'
+              : 'bg-white/80 text-gray-600 shadow hover:bg-white'
+          }`}
+        >
+          Chat
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('library')}
+          className={`rounded-full px-5 py-2 text-sm font-medium transition ${
+            activeTab === 'library'
+              ? 'bg-[#b52230] text-white shadow'
+              : 'bg-white/80 text-gray-600 shadow hover:bg-white'
+          }`}
+        >
+          Library
+        </button>
       </div>
 
-      {THINKING_ENABLED && (
+      {activeTab === 'chat' ? (
+        <div
+          className={`chat-container ${
+            THINKING_ENABLED && showThinking ? 'sidebar-open' : ''
+          } w-full sm:max-w-xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto px-4`}
+        >
+          {hasConversation && (
+            <div className="chat-panel mb-4 flex h-[70vh] w-full flex-col rounded-xl bg-white shadow-lg">
+              <ErrorBoundary>
+                <ResponseDisplay
+                  messages={messages}
+                  loading={loading}
+                  onSelectThinking={(t) => {
+                    if (THINKING_ENABLED) {
+                      setThink(t)
+                      setShowThinking(true)
+                    }
+                  }}
+                  thinkingEnabled={THINKING_ENABLED}
+                />
+              </ErrorBoundary>
+            </div>
+          )}
+
+          {!hasConversation && (
+            <section className="mb-4 w-full">
+              <div className="mx-auto max-w-2xl rounded-2xl bg-white/85 p-6 shadow-lg backdrop-blur">
+                <div className="mb-4 text-center text-lg font-bold text-gray-600">Modell: gpt-oss-20b</div>
+                <div className="mb-3 flex items-center gap-2 text-gray-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-yellow-500">
+                    <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />
+                  </svg>
+                  <span className="font-medium">Vorgeschlagen</span>
+                </div>
+                <div className="space-y-3">
+                  {EXAMPLE_PROMPTS.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => handleSend(p)}
+                      className="w-full rounded-xl bg-[#b52230] p-4 text-left text-white shadow ring-1 ring-[#b52230]/30 transition hover:bg-[#9f1e2a]"
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-4">
+                  <QueryInterface onSend={handleSend} placeholder="Wie kann ich Dir helfen?" autoFocus />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {hasConversation && (
+            <QueryInterface onSend={handleSend} placeholder="Weiter fragen …" autoFocus={false} />
+          )}
+
+          {THINKING_ENABLED && showThinking && <ThinkingSidebar think={think} />}
+        </div>
+      ) : (
+        <div className="w-full sm:max-w-xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl px-4">
+          {namespace ? (
+            <div className="mx-auto flex flex-col gap-6">
+              <Upload namespaceId={namespace.id} csrfToken={csrfToken} onUploaded={handleUploadComplete} />
+              <Library documents={documents} loading={docsLoading} onRefresh={handleRefresh} onDelete={handleDelete} />
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-white/90 p-6 text-center text-sm text-gray-600 shadow">
+              You do not have access to a namespace yet. Contact your administrator to get started.
+            </div>
+          )}
+        </div>
+      )}
+
+      {THINKING_ENABLED && activeTab === 'chat' && (
         <button
           onClick={() => setShowThinking(!showThinking)}
-          className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-full hover:bg-blue-700"
+          className="mt-4 rounded-full bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
         >
           {showThinking ? 'Hide Thinking' : 'Show Thinking'}
         </button>

@@ -32,6 +32,7 @@ class Chunk(Base):
     text = Column(Text, nullable=False)
     metadata_ = Column("metadata", JSONB, nullable=True)
     vector = Column(Vector(1536), nullable=True)
+    ordinal = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     document = relationship("Document", back_populates="chunks")
