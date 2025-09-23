@@ -13,12 +13,29 @@ from backend.app.core.db import get_session
 from backend.app.models import Namespace, NamespaceMember, User
 
 
-def _get_or_create_user(session, email: str, display_name: str | None = None) -> User:
-    user = session.query(User).filter(User.email == email).one_or_none()
+def _get_or_create_user(
+    session,
+    email: str,
+    display_name: str | None = None,
+    oidc_sub: str | None = None,
+) -> User:
+    user = None
+    if oidc_sub:
+        user = session.query(User).filter(User.oidc_sub == oidc_sub).one_or_none()
+
     if user is None:
-        user = User(email=email, display_name=display_name)
+        user = session.query(User).filter(User.email == email).one_or_none()
+
+    if user is None:
+        user = User(email=email, display_name=display_name, oidc_sub=oidc_sub)
         session.add(user)
         session.flush()
+    else:
+        if display_name and user.display_name != display_name:
+            user.display_name = display_name
+        if oidc_sub and not user.oidc_sub:
+            user.oidc_sub = oidc_sub
+
     return user
 
 
@@ -52,7 +69,12 @@ def main(context: AbstractContextManager | None = None) -> None:
 
     session_ctx = context or get_session()
     with session_ctx as session:
-        user = _get_or_create_user(session, email="dev@example.com", display_name="Dev User")
+        user = _get_or_create_user(
+            session,
+            email="dev@example.com",
+            display_name="Dev User",
+            oidc_sub="dev-oidc-sub",
+        )
         namespace = _get_or_create_namespace(session, slug="dev", name="Development")
         membership = _ensure_membership(session, user, namespace)
 

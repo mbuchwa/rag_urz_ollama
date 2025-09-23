@@ -15,6 +15,7 @@ class User(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     email = Column(String, nullable=False, unique=True, index=True)
+    oidc_sub = Column(String, nullable=True, unique=True, index=True)
     display_name = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

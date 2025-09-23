@@ -1,9 +1,12 @@
 import { useState } from 'react'
+
+import { useAuth } from '../context/AuthContext'
 import logo from '/imgs/logo.png'
 import chatbotLogo from '/imgs/chatbot_logo.png'
 import QueryInterface from './QueryInterface'
 import ResponseDisplay from './ResponseDisplay'
 import ThinkingSidebar from './ThinkingSidebar'
+import Navbar from './Navbar'
 import { ErrorBoundary } from './ErrorBoundary'
 
 const THINKING_ENABLED = import.meta.env.VITE_ENABLE_MODEL_THINKING === 'true'
@@ -21,6 +24,7 @@ interface Message {
 }
 
 export default function Home() {
+  const { csrfToken } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [think, setThink] = useState('')
@@ -31,9 +35,17 @@ export default function Home() {
     setMessages((m) => [...m, { sender: 'user', text }])
     setLoading(true)
     try {
-      const res = await fetch('/chat', {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      }
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken
+      }
+
+      const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({ message: text }),
       })
       if (!res.body) throw new Error('No response body')
@@ -102,7 +114,8 @@ export default function Home() {
   const hasConversation = messages.length > 0
 
   return (
-    <div className="flex flex-col items-center min-h-screen pt-8 text-gray-800">
+    <div className="flex min-h-screen flex-col items-center pt-8 text-gray-800">
+      <Navbar />
       {/* Header */}
       <header className="flex flex-col items-center gap-2 mb-6 bg-white px-6 py-4 rounded shadow">
         <div className="flex items-center gap-4">
