@@ -1,0 +1,133 @@
+/* Base */
+body {
+  font-family: sans-serif;
+  margin: 0;
+  background: transparent;
+  position: relative; /* for overlay stacking */
+}
+
+/* Keep app above the lightening overlay */
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+/* Lighten the background image with a soft white veil */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.4); /* adjust alpha to taste */
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Layout for collapsible thinking sidebar */
+.chat-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  transition: grid-template-columns 0.3s ease-in-out;
+  position: relative;
+}
+
+.sidebar-open {
+  grid-template-columns: 1fr 300px;
+}
+
+.chat-panel {
+  height: 100%;
+}
+
+.sidebar {
+  background: #f3f3f3;
+  padding: 1rem;
+  overflow-y: auto;
+  border-left: 1px solid #ccc;
+}
+
+/* Chat markdown styling */
+.chat-markdown {
+  line-height: 1.65;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.chat-markdown p { margin: 0.5rem 0; }
+
+.chat-markdown h1,
+.chat-markdown h2,
+.chat-markdown h3 {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+
+.chat-markdown h1 { font-size: 1.25rem; }
+.chat-markdown h2 { font-size: 1.125rem; }
+.chat-markdown h3 { font-size: 1rem; }
+
+.chat-markdown ul { list-style: disc; padding-left: 1.25rem; margin: 0.5rem 0; }
+.chat-markdown ol { list-style: decimal; padding-left: 1.25rem; margin: 0.5rem 0; }
+
+.chat-markdown a {
+  color: #2563eb;
+  text-decoration: underline;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+.chat-markdown a[href^="mailto:"] {
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+.chat-markdown blockquote {
+  border-left: 4px solid #e5e7eb; /* gray-200 */
+  padding-left: 0.75rem;
+  color: #374151;                 /* gray-700 */
+  margin: 0.75rem 0;
+}
+
+.chat-markdown pre {
+  background: #f3f4f6;   /* light gray */
+  color: #111827;        /* near-black text */
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  overflow: auto;
+}
+
+.chat-markdown pre code {
+  background: transparent;
+}
+
+.chat-markdown code {
+  background: #eef2ff;   /* subtle indigo tint for inline code */
+  color: #111827;
+}
+
+.chat-link {
+  color: #2563eb;           /* blue-600 */
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+
+/* Tables */
+.chat-markdown table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; }
+.chat-markdown th, .chat-markdown td {
+  border: 1px solid #e5e7eb;     /* gray-200 */
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.chat-markdown thead th { background: #f8fafc; font-weight: 600; }
+.chat-markdown tbody tr:nth-child(odd) { background: #fcfdff; } /* subtle zebra */
+
+/* Splash logo animation */
+@keyframes logo-motion {
+  0% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(0deg); }
+  80% { transform: translateY(0) rotate(0deg); }
+  100% { transform: translateY(0) rotate(360deg);} }
+
+.logo-animation {animation: logo-motion 2s ease-in-out forwards;}
+

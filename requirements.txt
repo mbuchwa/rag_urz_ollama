@@ -1,0 +1,41 @@
+# ---- PyTorch (CUDA 12.1) ----
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch==2.4.0+cu121
+torchvision==0.19.0+cu121
+
+# ---- Core libs ----
+aiofiles==24.1.0
+aiohttp==3.10.5
+beautifulsoup4==4.12.3
+requests==2.32.3
+Flask==3.0.3
+nest-asyncio==1.6.0
+
+# ---- PDF & OCR ----
+pdf2image==1.17.0
+pdfplumber==0.11.4
+pytesseract==0.3.13
+
+# ---- FAISS ----
+faiss-cpu==1.9.0
+
+# ---- ML & NLP ----
+numpy==1.26.4
+sentence-transformers==3.1.1
+transformers==4.44.2
+
+# ---- Ollama ----
+ollama==0.5.1
+
+# ---- Llama-Index (all at 0.13.0) ----
+llama-index==0.13.0
+llama-index-cli
+llama-index-llms-ollama
+llama-index-embeddings-huggingface
+llama-index-core
+llama-index-indices-managed-llama-cloud
+llama-index-instrumentation
+llama-index-legacy
+llama-index-readers-file
+llama-index-readers-llama-parse
+llama-index-vector-stores-faiss
