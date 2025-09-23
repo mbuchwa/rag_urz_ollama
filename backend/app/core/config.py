@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     OIDC_CLIENT_ID: str = Field(default="client-id")
     OIDC_CLIENT_SECRET: str = Field(default="client-secret")
     OIDC_ISSUER: str = Field(default="https://example.com/oidc")
+    OIDC_REDIRECT_URI: str = Field(default="http://localhost:8000/auth/callback")
+
+    FRONTEND_URL: str = Field(default="http://localhost:3000")
+
+    SESSION_SECRET: str = Field(default="change-me")
+    SESSION_COOKIE_NAME: str = Field(default="rag_session")
+    SESSION_COOKIE_SECURE: bool = Field(default=True)
 
     OLLAMA_HOST: str = Field(default="http://ollama:11434")
 
