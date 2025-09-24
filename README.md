@@ -47,7 +47,7 @@ cp .env.example .env
 ```
 
 The defaults target local containers: PostgreSQL with the pgvector extension, Redis, MinIO,
-and an Ollama runtime.
+and expect an Ollama runtime to be available on the Docker host.
 
 ### 2. Build Images
 
@@ -71,7 +71,11 @@ The command starts the following services:
 | `db`       | PostgreSQL 16 with pgvector extension  | 5432 |
 | `redis`    | Redis message broker / cache           | 6379 |
 | `minio`    | S3-compatible object storage           | 9000 (API), 9001 (console) |
-| `ollama`   | Local model runtime                    | 11434 |
+
+> **Note**
+> Start `ollama serve` (or ensure another Ollama daemon is listening on port 11434) on the
+> host machine before launching Docker Compose. The containers reach it through
+> `http://host.docker.internal:11434`.
 
 ### 4. Smoke Test
 
