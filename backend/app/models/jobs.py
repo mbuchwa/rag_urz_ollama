@@ -28,3 +28,9 @@ class Job(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     namespace = relationship("Namespace", back_populates="jobs")
+    crawl_results = relationship(
+        "CrawlResult",
+        back_populates="job",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

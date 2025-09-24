@@ -13,6 +13,7 @@ class Base(DeclarativeBase):
 # circular import issues when the individual model modules import ``Base``.
 from .chunks import Chunk  # noqa: F401  (re-export for convenience)
 from .conversations import Conversation  # noqa: F401
+from .crawl_results import CrawlResult  # noqa: F401
 from .documents import Document  # noqa: F401
 from .jobs import Job  # noqa: F401
 from .messages import Message  # noqa: F401
@@ -26,6 +27,7 @@ __all__ = [
     "Chunk",
     "Conversation",
     "Document",
+    "CrawlResult",
     "Job",
     "Message",
     "Namespace",

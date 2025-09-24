@@ -9,6 +9,7 @@ import ThinkingSidebar from './ThinkingSidebar'
 import Navbar from './Navbar'
 import { ErrorBoundary } from './ErrorBoundary'
 import Upload from './Upload'
+import CrawlJobs from './CrawlJobs'
 import Library, { type DocumentRecord } from './Library'
 
 const THINKING_ENABLED = import.meta.env.VITE_ENABLE_MODEL_THINKING === 'true'
@@ -313,6 +314,7 @@ export default function Home() {
           {namespace ? (
             <div className="mx-auto flex flex-col gap-6">
               <Upload namespaceId={namespace.id} csrfToken={csrfToken} onUploaded={handleUploadComplete} />
+              <CrawlJobs namespaceId={namespace.id} csrfToken={csrfToken} />
               <Library documents={documents} loading={docsLoading} onRefresh={handleRefresh} onDelete={handleDelete} />
             </div>
           ) : (

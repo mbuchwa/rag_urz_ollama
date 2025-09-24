@@ -1,6 +1,7 @@
 """Celery tasks for asynchronous processing."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ from ..core.config import settings
 from ..core.db import SessionLocal
 from ..core.s3 import get_minio_client
 from ..ingest import chunking, embeddings, parsers
+from ..ingest.crawler import run_crawl
 from ..models import Chunk, Document, Job
 from ..models.documents import DocumentStatus
 from .celery_app import celery_app
@@ -143,6 +145,95 @@ def ingest_document(document_id: str, job_id: str | None = None) -> str:
                 logger.exception("Failed to update job %s failure state", job_id)
 
         session.commit()
+        return "failed"
+    finally:
+        session.close()
+
+
+@celery_app.task(name="workers.crawl_site")
+def crawl_site(job_id: str) -> str:
+    """Run the asynchronous crawler for the provided job identifier."""
+
+    session = SessionLocal()
+
+    try:
+        job_uuid = uuid.UUID(job_id)
+    except (TypeError, ValueError):  # pragma: no cover - defensive
+        logger.error("Invalid crawl job id provided: %s", job_id)
+        session.close()
+        return "invalid"
+
+    job = session.get(Job, job_uuid)
+    if job is None:
+        logger.error("Crawl job %s not found", job_uuid)
+        session.close()
+        return "missing"
+    if job.task_type != "crawl":
+        logger.error("Job %s has unexpected task type %s", job_uuid, job.task_type)
+        session.close()
+        return "invalid"
+
+    payload = job.payload or {}
+    root_url = payload.get("url")
+    depth_raw = payload.get("depth", 2)
+    try:
+        depth = int(depth_raw)
+    except (TypeError, ValueError):
+        depth = 2
+    depth = max(0, min(depth, 3))
+
+    if not isinstance(root_url, str) or not root_url:
+        job.status = "failed"
+        job.error = "Missing crawl URL"
+        job.updated_at = datetime.now(timezone.utc)
+        session.commit()
+        session.close()
+        return "invalid"
+
+    job.status = "running"
+    job.error = None
+    job.updated_at = datetime.now(timezone.utc)
+    session.commit()
+
+    def _enqueue_ingest(document_id: str) -> None:
+        ingest_document.delay(str(document_id))
+
+    try:
+        summary = asyncio.run(
+            run_crawl(
+                session=session,
+                job_id=job_uuid,
+                namespace_id=job.namespace_id,
+                root_url=root_url,
+                max_depth=depth,
+                ingest_callback=_enqueue_ingest,
+            )
+        )
+        job = session.get(Job, job_uuid)
+        if job:
+            job.status = "succeeded"
+            job.error = None
+            job.payload = {
+                "url": root_url,
+                "depth": depth,
+                "total": summary.total,
+                "harvested": summary.harvested,
+                "failed": summary.failed,
+                "blocked": summary.blocked,
+                "skipped": summary.skipped,
+            }
+            job.updated_at = datetime.now(timezone.utc)
+            session.commit()
+        return "succeeded"
+    except Exception as exc:  # pragma: no cover - defensive logging
+        session.rollback()
+        logger.exception("Failed to crawl site for job %s: %s", job_id, exc)
+        job = session.get(Job, job_uuid)
+        if job:
+            job.status = "failed"
+            job.error = str(exc)[:1000]
+            job.updated_at = datetime.now(timezone.utc)
+            session.commit()
         return "failed"
     finally:
         session.close()
