@@ -177,10 +177,11 @@ body::before {
 }
 
 .login-logo {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #b51234;
-  letter-spacing: 0.08em;
+  display: block;
+  height: 64px;
+  width: auto;
+  margin: 0 auto;
+  object-fit: contain;
 }
 
 .login-subtitle {
