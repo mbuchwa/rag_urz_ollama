@@ -4,9 +4,13 @@ import { useAuth } from '../context/AuthContext'
 import logo from '/imgs/logo.png'
 import chatbotLogo from '/imgs/chatbot_logo.png'
 import QueryInterface from './QueryInterface'
-import ResponseDisplay from './ResponseDisplay'
+import ResponseDisplay, {
+  type Message as DisplayMessage,
+  type Citation,
+} from './ResponseDisplay'
 import ThinkingSidebar from './ThinkingSidebar'
 import Navbar from './Navbar'
+import SourceSidebar from './SourceSidebar'
 import { ErrorBoundary } from './ErrorBoundary'
 import Upload from './Upload'
 import CrawlJobs from './CrawlJobs'
@@ -20,22 +24,31 @@ const EXAMPLE_PROMPTS = [
   'How to setup MFA Token?',
 ]
 
-interface Message {
-  sender: 'user' | 'bot'
-  text: string
-  think?: string
-}
-
 export default function Home() {
   const { csrfToken, namespaces } = useAuth()
-  const namespace = useMemo(() => namespaces[0] ?? null, [namespaces])
+  const [namespaceId, setNamespaceId] = useState<string | null>(null)
+  const namespace = useMemo(
+    () => namespaces.find((ns) => ns.id === namespaceId) ?? null,
+    [namespaces, namespaceId],
+  )
   const [activeTab, setActiveTab] = useState<'chat' | 'library'>('chat')
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [think, setThink] = useState('')
   const [showThinking, setShowThinking] = useState(false)
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
   const [docsLoading, setDocsLoading] = useState(false)
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [selectedSource, setSelectedSource] = useState<Citation | null>(null)
+
+  useEffect(() => {
+    setNamespaceId((prev) => {
+      if (prev && namespaces.some((ns) => ns.id === prev)) {
+        return prev
+      }
+      return namespaces[0]?.id ?? null
+    })
+  }, [namespaces])
 
   const fetchDocuments = useCallback(async () => {
     if (!namespace) {
@@ -91,29 +104,81 @@ export default function Home() {
   useEffect(() => {
     if (activeTab !== 'chat') {
       setShowThinking(false)
+      setSelectedSource(null)
     }
   }, [activeTab])
 
+  useEffect(() => {
+    setMessages([])
+    setConversationId(null)
+    setSelectedSource(null)
+    setThink('')
+  }, [namespaceId])
+
+  const ensureConversation = useCallback(async () => {
+    if (!namespace) return null
+    if (conversationId) return conversationId
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken
+    }
+
+    const payload: Record<string, unknown> = { namespace_id: namespace.id }
+    if (conversationId) {
+      payload.conversation_id = conversationId
+    }
+
+    const res = await fetch('/api/chat/start', {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    })
+
+    if (!res.ok) {
+      throw new Error(`Failed to start conversation (${res.status})`)
+    }
+
+    const data = await res.json()
+    if (typeof data.conversation_id !== 'string' || !data.conversation_id) {
+      throw new Error('Invalid conversation response')
+    }
+    setConversationId(data.conversation_id)
+    return data.conversation_id as string
+  }, [conversationId, csrfToken, namespace])
+
   const handleSend = useCallback(
     async (text: string) => {
-      if (!text) return
+      if (!text || !namespace) return
+      setSelectedSource(null)
       setMessages((m) => [...m, { sender: 'user', text }])
       setLoading(true)
       try {
-        const headers: HeadersInit = {
-          'Content-Type': 'application/json',
-        }
-        if (csrfToken) {
-          headers['X-CSRF-Token'] = csrfToken
+        const convId = await ensureConversation()
+        if (!convId) {
+          throw new Error('Missing conversation identifier')
         }
 
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          headers,
-          credentials: 'include',
-          body: JSON.stringify({ message: text }),
+        const params = new URLSearchParams({
+          conversation_id: convId,
+          namespace_id: namespace.id,
+          q: text,
         })
-        if (!res.body) throw new Error('No response body')
+
+        const res = await fetch(`/api/chat/stream?${params.toString()}`, {
+          method: 'GET',
+          headers: {
+            Accept: 'text/event-stream',
+          },
+          credentials: 'include',
+        })
+
+        if (!res.ok || !res.body) {
+          throw new Error(`Chat request failed (${res.status})`)
+        }
 
         const reader = res.body.getReader()
         const decoder = new TextDecoder()
@@ -122,13 +187,12 @@ export default function Home() {
         let answer = ''
         let buffer = ''
         let live = true
-        let lastTick = Date.now()
-        const tick = () => Date.now() - lastTick < 30000
+        let citations: Citation[] = []
+        let hadError = false
 
         while (live) {
           const { value, done } = await reader.read()
           if (done) break
-          lastTick = Date.now()
 
           buffer += decoder.decode(value, { stream: true })
           let idx: number
@@ -136,45 +200,115 @@ export default function Home() {
             const frame = buffer.slice(0, idx).trim()
             buffer = buffer.slice(idx + 2)
             if (!frame.startsWith('data:')) continue
-            const payload = JSON.parse(frame.slice(5).trim())
+            const raw = frame.slice(5).trim()
+            if (!raw) continue
+            let payload: any
+            try {
+              payload = JSON.parse(raw)
+            } catch (error) {
+              console.warn('Failed to parse chat frame', error)
+              continue
+            }
 
-          if (payload.token) {
-            answer += payload.token
-            setMessages((m) => {
-              const arr = [...m]
-              arr[arr.length - 1] = { sender: 'bot', text: answer }
-              return arr
-            })
-          }
+            if (typeof payload.token === 'string') {
+              answer += payload.token
+              setMessages((m) => {
+                const arr = [...m]
+                const last = arr[arr.length - 1]
+                if (last && last.sender === 'bot') {
+                  arr[arr.length - 1] = { ...last, text: answer }
+                }
+                return arr
+              })
+            }
 
-          if (payload.think !== undefined) {
-            const thinkText = payload.think || ''
-            setMessages((m) => {
-              const arr = [...m]
-              const last = arr[arr.length - 1]
-              if (last && last.sender === 'bot') {
-                arr[arr.length - 1] = { ...last, think: thinkText }
-              }
-              return arr
-            })
-          }
+            if (Array.isArray(payload.citations)) {
+              citations = payload.citations
+                .map((c: any): Citation | null => {
+                  if (!c || typeof c.doc_id !== 'string') return null
+                  return {
+                    docId: c.doc_id,
+                    ord: Number(c.ord) || 0,
+                    title: typeof c.title === 'string' ? c.title : null,
+                    chunkId: typeof c.chunk_id === 'string' ? c.chunk_id : null,
+                    text: typeof c.text === 'string' ? c.text : null,
+                  }
+                })
+                .filter((c: Citation | null): c is Citation => Boolean(c))
+              setMessages((m) => {
+                const arr = [...m]
+                const last = arr[arr.length - 1]
+                if (last && last.sender === 'bot') {
+                  arr[arr.length - 1] = { ...last, citations }
+                }
+                return arr
+              })
+            }
 
-          if (payload.done) {
-            live = false
-            try { await reader.cancel() } catch {}
-            break
+            if (payload.error) {
+              live = false
+              citations = []
+              hadError = true
+              setMessages((m) => {
+                const arr = [...m]
+                const last = arr[arr.length - 1]
+                if (last && last.sender === 'bot') {
+                  arr[arr.length - 1] = {
+                    ...last,
+                    text: 'The assistant could not generate a response.',
+                    citations: [],
+                  }
+                }
+                return arr
+              })
+              break
+            }
+
+            if (payload.done) {
+              live = false
+              break
+            }
           }
         }
 
-        if (!tick()) break
+        try {
+          await reader.cancel()
+        } catch (error) {
+          console.warn('Failed to cancel reader', error)
+        }
+
+        if (!hadError) {
+          setMessages((m) => {
+            const arr = [...m]
+            const last = arr[arr.length - 1]
+            if (last && last.sender === 'bot') {
+              arr[arr.length - 1] = { ...last, text: answer, citations }
+            }
+            return arr
+          })
+        }
+      } catch (e) {
+        console.error(e)
+        setMessages((m) => {
+          const arr = [...m]
+          const last = arr[arr.length - 1]
+          if (last && last.sender === 'bot') {
+            arr[arr.length - 1] = {
+              ...last,
+              text: 'Error contacting server.',
+              citations: [],
+            }
+          } else {
+            arr.push({ sender: 'bot', text: 'Error contacting server.' })
+          }
+          return arr
+        })
+      } finally {
+        setLoading(false)
       }
-    } catch (e) {
-      console.error(e)
-      setMessages((m) => [...m, { sender: 'bot', text: 'Error contacting server.' }])
-    } finally {
-      setLoading(false)
-    }
-  }, [csrfToken])
+    },
+    [ensureConversation, namespace],
+  )
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -212,10 +346,17 @@ export default function Home() {
   }, [fetchDocuments])
 
   const hasConversation = activeTab === 'chat' && messages.length > 0
+  const sidebarActive =
+    (THINKING_ENABLED && showThinking && activeTab === 'chat') || selectedSource !== null
 
   return (
     <div className="flex min-h-screen flex-col items-center pt-8 text-gray-800">
-      <Navbar />
+      <Navbar
+        selectedNamespaceId={namespaceId}
+        onNamespaceChange={(id) => {
+          setNamespaceId(id || null)
+        }}
+      />
       <header className="mb-6 flex flex-col items-center gap-2 rounded bg-white px-6 py-4 shadow">
         <div className="flex items-center gap-4">
           <img src={logo} alt="Heidelberg University" className="h-20" />
@@ -254,7 +395,7 @@ export default function Home() {
       {activeTab === 'chat' ? (
         <div
           className={`chat-container ${
-            THINKING_ENABLED && showThinking ? 'sidebar-open' : ''
+            sidebarActive ? 'sidebar-open' : ''
           } w-full sm:max-w-xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto px-4`}
         >
           {hasConversation && (
@@ -270,6 +411,9 @@ export default function Home() {
                     }
                   }}
                   thinkingEnabled={THINKING_ENABLED}
+                  onSelectCitation={(citation) => {
+                    setSelectedSource(citation)
+                  }}
                 />
               </ErrorBoundary>
             </div>
@@ -307,7 +451,14 @@ export default function Home() {
             <QueryInterface onSend={handleSend} placeholder="Weiter fragen …" autoFocus={false} />
           )}
 
-          {THINKING_ENABLED && showThinking && <ThinkingSidebar think={think} />}
+          {selectedSource ? (
+            <SourceSidebar
+              citation={selectedSource}
+              onClose={() => setSelectedSource(null)}
+            />
+          ) : (
+            THINKING_ENABLED && showThinking && <ThinkingSidebar think={think} />
+          )}
         </div>
       ) : (
         <div className="w-full sm:max-w-xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl px-4">

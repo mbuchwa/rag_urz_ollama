@@ -12,10 +12,19 @@ declare global {
   }
 }
 
+export interface Citation {
+  docId: string
+  ord: number
+  title: string | null
+  chunkId?: string | null
+  text?: string | null
+}
+
 export interface Message {
-  sender: "user" | "bot";
-  text: unknown;
-  think?: string;
+  sender: "user" | "bot"
+  text: unknown
+  think?: string
+  citations?: Citation[]
 }
 
 type Props = {
@@ -23,6 +32,7 @@ type Props = {
   loading: boolean;
   onSelectThinking: (think: string) => void;
   thinkingEnabled: boolean;
+  onSelectCitation?: (citation: Citation) => void;
 };
 
 function toStr(v: unknown) {
@@ -122,6 +132,7 @@ export default function ResponseDisplay({
   loading,
   onSelectThinking,
   thinkingEnabled,
+  onSelectCitation,
 }: Props) {
   const [libsReady, setLibsReady] = useState(
     !!(window.marked && window.DOMPurify)
@@ -175,10 +186,32 @@ export default function ResponseDisplay({
             }`}
             dangerouslySetInnerHTML={{ __html: m.__html }}
           />
+          {m.sender === "bot" && Array.isArray(m.citations) && m.citations.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {m.citations.map((citation: Citation, idx: number) => (
+                <button
+                  key={`${citation.docId}-${citation.ord}-${idx}`}
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onSelectCitation?.(citation)
+                  }}
+                  className="citation-badge"
+                >
+                  <span className="font-semibold">Source {idx + 1}</span>
+                  {citation.title && (
+                    <span className="ml-1 truncate text-xs text-gray-600">
+                      {citation.title}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       ))}
 
-            {loading && (
+      {loading && (
         <div className="flex justify-center py-2">
           <svg
             className="animate-spin h-6 w-6 text-gray-500"
