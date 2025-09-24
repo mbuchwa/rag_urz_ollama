@@ -12,4 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend ./backend
 
+RUN chmod +x backend/scripts/start.sh
+
+ENTRYPOINT ["./backend/scripts/start.sh"]
 CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
