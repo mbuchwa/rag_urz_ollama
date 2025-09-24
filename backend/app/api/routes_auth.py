@@ -169,9 +169,15 @@ async def local_login(
 
     expected_email = settings.LOCAL_LOGIN_EMAIL.strip().lower()
     expected_password = settings.LOCAL_LOGIN_PASSWORD
+    if isinstance(expected_password, str):
+        expected_password = expected_password.strip()
+    else:  # pragma: no cover - defensive
+        expected_password = str(expected_password)
 
     provided_email = payload.email.strip().lower()
-    if provided_email != expected_email or payload.password != expected_password:
+    provided_password = payload.password.strip()
+
+    if provided_email != expected_email or provided_password != expected_password:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
     user = await _upsert_user(
