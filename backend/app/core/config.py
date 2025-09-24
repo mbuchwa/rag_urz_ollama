@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     SESSION_COOKIE_NAME: str = Field(default="rag_session")
     SESSION_COOKIE_SECURE: bool = Field(default=True)
 
-    OLLAMA_HOST: str = Field(default="http://ollama:11434")
+    OLLAMA_HOST: str = Field(default="http://host.docker.internal:11434")
     OLLAMA_MODEL: str = Field(default="gpt-oss-20b")
     OLLAMA_TIMEOUT: float = Field(default=120.0)
 
