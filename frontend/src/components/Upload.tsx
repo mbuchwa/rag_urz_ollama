@@ -1,5 +1,7 @@
 import { type DragEvent, useCallback, useRef, useState } from 'react'
 
+import { apiUrl } from '../utils/api'
+
 type UploadProps = {
   namespaceId: string | null
   csrfToken: string | null
@@ -65,7 +67,7 @@ export default function Upload({ namespaceId, csrfToken, onUploaded }: UploadPro
       setError(null)
 
       try {
-        const initRes = await fetch('/api/docs/upload-init', {
+        const initRes = await fetch(apiUrl('/api/docs/upload-init'), {
           method: 'POST',
           credentials: 'include',
           headers: {
@@ -92,7 +94,7 @@ export default function Upload({ namespaceId, csrfToken, onUploaded }: UploadPro
 
         await uploadFile(uploadUrl, file, setProgress)
 
-        const completeRes = await fetch('/api/docs/complete', {
+        const completeRes = await fetch(apiUrl('/api/docs/complete'), {
           method: 'POST',
           credentials: 'include',
           headers: {

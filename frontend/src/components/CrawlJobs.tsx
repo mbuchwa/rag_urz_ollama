@@ -1,5 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 
+import { apiUrl } from '../utils/api'
+
 type CrawlJobsProps = {
   namespaceId: string
   csrfToken: string | null
@@ -72,7 +74,7 @@ export default function CrawlJobs({ namespaceId, csrfToken }: CrawlJobsProps) {
   const fetchJobs = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/crawl/jobs?namespace_id=${namespaceId}`, { credentials: 'include' })
+      const res = await fetch(apiUrl(`/api/crawl/jobs?namespace_id=${namespaceId}`), { credentials: 'include' })
       if (!res.ok) {
         throw new Error(`Failed to load crawl jobs (${res.status})`)
       }
@@ -109,7 +111,7 @@ export default function CrawlJobs({ namespaceId, csrfToken }: CrawlJobsProps) {
     async (jobId: string) => {
       setDetailsLoading(true)
       try {
-        const res = await fetch(`/api/crawl/${jobId}`, { credentials: 'include' })
+        const res = await fetch(apiUrl(`/api/crawl/${jobId}`), { credentials: 'include' })
         if (!res.ok) {
           throw new Error(`Failed to load crawl job details (${res.status})`)
         }
@@ -166,7 +168,7 @@ export default function CrawlJobs({ namespaceId, csrfToken }: CrawlJobsProps) {
       setSubmitting(true)
       setError(null)
       try {
-        const res = await fetch('/api/crawl/start', {
+        const res = await fetch(apiUrl('/api/crawl/start'), {
           method: 'POST',
           credentials: 'include',
           headers: {

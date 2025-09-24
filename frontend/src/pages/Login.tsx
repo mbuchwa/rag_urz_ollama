@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../context/AuthContext'
+import { apiUrl } from '../utils/api'
 
 import chatbotLogo from '/imgs/chatbot_psy.png'
 
@@ -31,7 +32,7 @@ export default function Login() {
     setSubmitting(true)
     setError(null)
     try {
-      const response = await fetch('/auth/local-login', {
+      const response = await fetch(apiUrl('/auth/local-login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
