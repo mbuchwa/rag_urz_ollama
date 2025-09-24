@@ -86,19 +86,6 @@ curl http://localhost:8000/admin/health
 # {"status":"ok"}
 ```
 
-For a fresh stack this also exercises the database migrations that run at container start. The
-development login is enabled by default, so you can request a session cookie with the bundled
-credentials:
-
-```bash
-curl -i -X POST http://localhost:8000/auth/local-login \
-  -H 'Content-Type: application/json' \
-  -d '{"email": "test@uni-heidelberg.de", "password": "testtest"}'
-```
-
-The response should return `HTTP/1.1 200 OK` and include the `rag_session` and `csrf_token`
-cookies.
-
 You can then visit the chat UI at [http://localhost:3000](http://localhost:3000).
 
 ### 5. Run the test suite
@@ -110,22 +97,6 @@ The backend exposes a focused pytest suite. After installing the requirements fr
 cd backend
 pytest
 ```
-
-## Running the backend without Docker
-
-When you want to run Uvicorn directly on the host (for example while iterating on code with
-hot-reload), apply the Alembic migrations before starting the server so the database schema matches
-the models:
-
-```bash
-cd backend
-alembic upgrade head
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-The command uses the defaults from `backend/alembic.ini`; set the same environment variables as the
-Docker Compose stack (`cp .env.example .env` and source the values you need) so the API can connect
-to PostgreSQL.
 
 ## Environment Configuration
 
