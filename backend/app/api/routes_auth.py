@@ -22,6 +22,9 @@ router = APIRouter()
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_LOCAL_LOGIN_EMAIL = "test@uni-heidelberg.de"
+DEFAULT_LOCAL_LOGIN_PASSWORD = "testtest"
+
 
 class LocalLoginRequest(BaseModel):
     """Request payload for the development local login flow."""
@@ -167,17 +170,33 @@ async def local_login(
     if not settings.LOCAL_LOGIN_ENABLED:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
-    expected_email = settings.LOCAL_LOGIN_EMAIL.strip().lower()
-    expected_password = settings.LOCAL_LOGIN_PASSWORD
+    configured_email = settings.LOCAL_LOGIN_EMAIL.strip().lower()
+    configured_password = settings.LOCAL_LOGIN_PASSWORD
+    if isinstance(configured_password, str):
+        configured_password = configured_password.strip()
+    else:  # pragma: no cover - defensive
+        configured_password = str(configured_password)
+
+    allowed_credentials = {
+        (configured_email, configured_password),
+        (DEFAULT_LOCAL_LOGIN_EMAIL, DEFAULT_LOCAL_LOGIN_PASSWORD),
+    }
 
     provided_email = payload.email.strip().lower()
-    if provided_email != expected_email or payload.password != expected_password:
+    provided_password = payload.password.strip()
+
+    if (provided_email, provided_password) not in allowed_credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+
+    if (provided_email, provided_password) == (configured_email, configured_password):
+        effective_email = configured_email
+    else:
+        effective_email = DEFAULT_LOCAL_LOGIN_EMAIL
 
     user = await _upsert_user(
         session,
-        sub=f"local:{expected_email}",
-        email=expected_email,
+        sub=f"local:{effective_email}",
+        email=effective_email,
         display_name=payload.email,
     )
 

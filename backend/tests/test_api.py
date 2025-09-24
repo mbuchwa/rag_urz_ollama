@@ -10,6 +10,10 @@ import pytest
 
 from backend.app.api.routes_docs import UploadCompleteRequest
 from backend.app.core.config import settings
+from backend.app.api.routes_auth import (
+    DEFAULT_LOCAL_LOGIN_EMAIL,
+    DEFAULT_LOCAL_LOGIN_PASSWORD,
+)
 from backend.app.ingest import crawler as crawler_module
 from backend.app.models import Conversation, Document, Job, Namespace, NamespaceMember, User
 from backend.app.models.documents import DocumentStatus
@@ -42,6 +46,25 @@ def test_local_login_rejects_bad_credentials(app: Any) -> None:
     assert response.status_code == 401
     body = response.json()
     assert body["detail"] == "Invalid email or password"
+
+
+def test_local_login_accepts_default_credentials(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "LOCAL_LOGIN_EMAIL", "other@example.com")
+    monkeypatch.setattr(settings, "LOCAL_LOGIN_PASSWORD", "supersecret")
+
+    response = app.post(
+        "/auth/local-login",
+        json={
+            "email": DEFAULT_LOCAL_LOGIN_EMAIL,
+            "password": DEFAULT_LOCAL_LOGIN_PASSWORD,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["detail"] == "Logged in"
 
 
 def test_auth_guard_requires_session(app: Any) -> None:
