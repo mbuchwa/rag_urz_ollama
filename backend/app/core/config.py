@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     SESSION_SECRET: str = Field(default="change-me")
     SESSION_COOKIE_NAME: str = Field(default="rag_session")
-    SESSION_COOKIE_SECURE: bool = Field(default=True)
+    SESSION_COOKIE_SECURE: bool = Field(default=False)
 
     LOCAL_LOGIN_ENABLED: bool = Field(default=True)
     LOCAL_LOGIN_EMAIL: str = Field(default="test@uni-heidelberg.de")

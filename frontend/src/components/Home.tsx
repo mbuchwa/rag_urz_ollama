@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../context/AuthContext'
 import logo from '/imgs/logo.png'
-import chatbotLogo from '/imgs/chatbot_logo.png'
+import chatbotLogo from '/imgs/chatbot_psy.png'
 import QueryInterface from './QueryInterface'
 import ResponseDisplay, {
   type Message as DisplayMessage,

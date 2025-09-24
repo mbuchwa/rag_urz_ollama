@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../context/AuthContext'
 
+import chatbotLogo from '/imgs/chatbot_psy.png'
+
 export default function Login() {
   const { user, loading, refresh } = useAuth()
   const navigate = useNavigate()
@@ -59,7 +61,7 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <header className="login-header">
-          <div className="login-logo">heiBOX</div>
+          <img src={chatbotLogo} alt="Chatbot Psy" className="login-logo" />
           <div className="login-subtitle">Universitätsrechenzentrum Heidelberg</div>
         </header>
         <main>
