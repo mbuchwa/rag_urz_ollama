@@ -7,7 +7,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "0005_add_crawl_tables"
-down_revision = "0004_add_document_status_and_chunk_ordinals"
+down_revision = "0004_doc_status_chunk_ordinals"
 branch_labels = None
 depends_on = None
 

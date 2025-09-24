@@ -5,7 +5,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "0004_add_document_status_and_chunk_ordinals"
+revision = "0004_doc_status_chunk_ordinals"
 down_revision = "0003_add_oidc_sub_to_users"
 branch_labels = None
 depends_on = None
