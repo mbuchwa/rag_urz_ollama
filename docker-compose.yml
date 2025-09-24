@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
-    command: ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     env_file: .env
     ports:
       - "8000:8000"
@@ -21,6 +20,8 @@ services:
       context: .
       dockerfile: Dockerfile.api
     command: ["celery", "-A", "backend.app.workers.celery_app:celery_app", "worker", "--loglevel=info"]
+    environment:
+      RUN_MIGRATIONS: "0"
     env_file: .env
     depends_on:
       - db
