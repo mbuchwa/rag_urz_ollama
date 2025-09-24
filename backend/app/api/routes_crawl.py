@@ -10,7 +10,9 @@ from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy import Select, case, func, select
 from sqlalchemy.orm import Session
 
+from ..core.config import settings
 from ..core.db import get_session
+from ..core.rate_limiter import limiter
 from ..models import CrawlResult, Job, NamespaceMember
 from ..workers.tasks import crawl_site
 
@@ -64,6 +66,7 @@ class CrawlJobDetailResponse(BaseModel):
 
 
 @router.post("/start", response_model=CrawlStartResponse, summary="Start a crawl job")
+@limiter.limit(settings.RATE_LIMIT_CRAWL)
 async def start_crawl(
     payload: CrawlStartRequest,
     request: Request,

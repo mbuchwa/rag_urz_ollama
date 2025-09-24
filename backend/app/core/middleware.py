@@ -1,12 +1,18 @@
 """Custom ASGI middleware for authentication and CSRF protection."""
 from __future__ import annotations
 
+from __future__ import annotations
+
+import logging
+import time
 from typing import Awaitable, Callable
 
 from fastapi import status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+
+from .metrics import record_request
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
@@ -39,6 +45,52 @@ class AuthenticatedSessionMiddleware(BaseHTTPMiddleware):
                     )
 
         return await call_next(request)
+
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """Log structured request summaries and emit metrics."""
+
+    def __init__(self, app: Callable) -> None:
+        super().__init__(app)
+        self.logger = logging.getLogger("rag.request")
+
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        method = request.method
+        route = request.scope.get("route")
+        route_path = getattr(route, "path", request.url.path)
+        start = time.perf_counter()
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+        except Exception:
+            duration = time.perf_counter() - start
+            record_request(method, route_path, status_code, duration)
+            self.logger.exception(
+                "HTTP %s %s raised an unhandled exception", method, route_path
+            )
+            raise
+        duration = time.perf_counter() - start
+
+        user_id = None
+        try:
+            user_id = request.session.get("user_id")  # type: ignore[union-attr]
+        except Exception:  # pragma: no cover - defensive guard for ASGI scope issues
+            user_id = getattr(request.state, "user_id", None)
+
+        self.logger.info(
+            "HTTP %s %s status=%s user=%s duration=%.3f",
+            method,
+            route_path,
+            status_code,
+            user_id or "anonymous",
+            duration,
+        )
+        record_request(method, route_path, status_code, duration)
+        response.headers.setdefault("X-Process-Time", f"{duration:.6f}")
+        return response
 
 
 def _is_json_request(request: Request) -> bool:

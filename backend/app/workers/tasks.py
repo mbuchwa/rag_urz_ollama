@@ -9,6 +9,7 @@ from typing import Any
 
 from sqlalchemy import delete
 
+from ..core import metrics
 from ..core.config import settings
 from ..core.db import SessionLocal
 from ..core.s3 import get_minio_client
@@ -39,6 +40,7 @@ def ingest_document(document_id: str, job_id: str | None = None) -> str:
         document_uuid = uuid.UUID(document_id)
     except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
         logger.error("Invalid document id provided to ingest task: %s", exc)
+        metrics.record_task_result("ingest_document", "invalid")
         session.close()
         return "invalid"
 
@@ -46,9 +48,11 @@ def ingest_document(document_id: str, job_id: str | None = None) -> str:
         document = session.get(Document, document_uuid)
         if document is None:
             logger.error("Document %s not found for ingestion", document_uuid)
+            metrics.record_task_result("ingest_document", "missing")
             return "missing"
         if document.deleted_at:
             logger.info("Skipping ingestion for deleted document %s", document_uuid)
+            metrics.record_task_result("ingest_document", "skipped")
             return "deleted"
 
         if job_id:
@@ -67,7 +71,7 @@ def ingest_document(document_id: str, job_id: str | None = None) -> str:
         session.flush()
 
         content = _download_document(document.uri)
-        metadata = document.metadata or {}
+        metadata = document.metadata_dict or {}
         parsed = parsers.parse_bytes(
             content,
             content_type=document.content_type,
@@ -99,7 +103,7 @@ def ingest_document(document_id: str, job_id: str | None = None) -> str:
                     namespace_id=document.namespace_id,
                     text=chunk.text,
                     token_count=_estimate_tokens(chunk.text),
-                    metadata=chunk_meta or None,
+                    metadata_dict=chunk_meta or None,
                     vector=vector,
                     ordinal=idx,
                 )
@@ -107,9 +111,9 @@ def ingest_document(document_id: str, job_id: str | None = None) -> str:
 
         document.status = DocumentStatus.INGESTED.value
         document.text_preview = chunks[0].text[:500]
-        metadata = document.metadata or {}
+        metadata = document.metadata_dict or {}
         metadata["chunk_count"] = len(chunks)
-        document.metadata = metadata
+        document.metadata_dict = metadata
         document.updated_at = datetime.now(timezone.utc)
 
         if job:
@@ -119,6 +123,7 @@ def ingest_document(document_id: str, job_id: str | None = None) -> str:
 
         session.commit()
         logger.info("Ingested document %s with %s chunks", document.id, len(chunks))
+        metrics.record_task_result("ingest_document", "succeeded")
         return "ingested"
     except Exception as exc:  # pragma: no cover - defensive logging
         session.rollback()
@@ -145,6 +150,7 @@ def ingest_document(document_id: str, job_id: str | None = None) -> str:
                 logger.exception("Failed to update job %s failure state", job_id)
 
         session.commit()
+        metrics.record_task_result("ingest_document", "failed")
         return "failed"
     finally:
         session.close()
@@ -160,16 +166,19 @@ def crawl_site(job_id: str) -> str:
         job_uuid = uuid.UUID(job_id)
     except (TypeError, ValueError):  # pragma: no cover - defensive
         logger.error("Invalid crawl job id provided: %s", job_id)
+        metrics.record_task_result("crawl_site", "invalid")
         session.close()
         return "invalid"
 
     job = session.get(Job, job_uuid)
     if job is None:
         logger.error("Crawl job %s not found", job_uuid)
+        metrics.record_task_result("crawl_site", "missing")
         session.close()
         return "missing"
     if job.task_type != "crawl":
         logger.error("Job %s has unexpected task type %s", job_uuid, job.task_type)
+        metrics.record_task_result("crawl_site", "invalid")
         session.close()
         return "invalid"
 
@@ -188,6 +197,7 @@ def crawl_site(job_id: str) -> str:
         job.updated_at = datetime.now(timezone.utc)
         session.commit()
         session.close()
+        metrics.record_task_result("crawl_site", "invalid")
         return "invalid"
 
     job.status = "running"
@@ -224,6 +234,7 @@ def crawl_site(job_id: str) -> str:
             }
             job.updated_at = datetime.now(timezone.utc)
             session.commit()
+        metrics.record_task_result("crawl_site", "succeeded")
         return "succeeded"
     except Exception as exc:  # pragma: no cover - defensive logging
         session.rollback()
@@ -234,6 +245,7 @@ def crawl_site(job_id: str) -> str:
             job.error = str(exc)[:1000]
             job.updated_at = datetime.now(timezone.utc)
             session.commit()
+        metrics.record_task_result("crawl_site", "failed")
         return "failed"
     finally:
         session.close()

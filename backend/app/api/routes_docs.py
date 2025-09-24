@@ -14,8 +14,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Select, delete, func, select
 from sqlalchemy.orm import Session
 
+from ..core.antivirus import ScanError, get_scanner
 from ..core.config import settings
 from ..core.db import get_session
+from ..core.rate_limiter import limiter
 from ..core.s3 import get_minio_client
 from ..models import Chunk, Document, Job, NamespaceMember
 from ..models.documents import DocumentStatus
@@ -25,6 +27,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 FILENAME_CLEANER = re.compile(r"[^A-Za-z0-9._-]+")
+ALLOWED_UPLOAD_TYPES = {value.lower() for value in settings.UPLOAD_ALLOWED_MIME_TYPES}
 
 
 class UploadInitRequest(BaseModel):
@@ -44,6 +47,11 @@ class UploadCompleteRequest(BaseModel):
     title: Optional[str] = Field(default=None, max_length=255)
     source_url: Optional[str] = Field(default=None, max_length=2048)
     metadata: Optional[dict[str, Any]] = None
+
+    def model_dump(self, *args, **kwargs):  # type: ignore[override]
+        if "mode" not in kwargs:
+            kwargs["mode"] = "json"
+        return super().model_dump(*args, **kwargs)
 
 
 class DocumentResponse(BaseModel):
@@ -111,7 +119,12 @@ async def _ensure_bucket() -> None:
         await run_in_threadpool(client.make_bucket, settings.MINIO_BUCKET)
 
 
-@router.post("/upload-init", response_model=UploadInitResponse, summary="Begin a document upload")
+@router.post(
+    "/upload-init",
+    response_model=UploadInitResponse,
+    summary="Begin a document upload",
+)
+@limiter.limit(settings.RATE_LIMIT_INGESTION)
 async def upload_init(
     payload: UploadInitRequest,
     request: Request,
@@ -123,14 +136,16 @@ async def upload_init(
     _assert_namespace_membership(session, payload.namespace_id, user_id)
 
     filename = _normalize_filename(payload.filename)
-    content_type = _infer_content_type(filename, payload.content_type)
+    content_type = _validate_content_type(
+        _infer_content_type(filename, payload.content_type)
+    )
 
     document = Document(
         namespace_id=payload.namespace_id,
         uri="",  # placeholder until we derive object key
         title=None,
         content_type=content_type,
-        metadata={"original_filename": payload.filename},
+        metadata_dict={"original_filename": payload.filename},
         status=DocumentStatus.UPLOADING.value,
     )
     session.add(document)
@@ -154,7 +169,12 @@ async def upload_init(
     return UploadInitResponse(document_id=document.id, upload_url=upload_url)
 
 
-@router.post("/complete", response_model=DocumentResponse, summary="Finalize an uploaded document")
+@router.post(
+    "/complete",
+    response_model=DocumentResponse,
+    summary="Finalize an uploaded document",
+)
+@limiter.limit(settings.RATE_LIMIT_INGESTION)
 async def upload_complete(
     payload: UploadCompleteRequest,
     request: Request,
@@ -169,15 +189,45 @@ async def upload_complete(
     if document is None or document.namespace_id != payload.namespace_id or document.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    document.title = payload.title or document.title or (document.metadata or {}).get("original_filename")
+    document.title = (
+        payload.title
+        or document.title
+        or (document.metadata_dict or {}).get("original_filename")
+    )
+    size, stored_content_type = await _stat_uploaded_object(document)
+    stored_content_type = _validate_content_type(stored_content_type)
+    _ensure_within_size_limit(size)
+
+    scanner = get_scanner()
+    try:
+        await run_in_threadpool(
+            scanner.scan,
+            bucket=settings.MINIO_BUCKET,
+            object_key=document.uri,
+            size=size,
+            content_type=stored_content_type,
+        )
+    except ScanError as exc:
+        logger.warning(
+            "Upload flagged by antivirus scanner document=%s error=%s",
+            document.id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file failed virus scan",
+        ) from exc
+
     document.status = DocumentStatus.UPLOADED.value
     document.error = None
-    metadata = document.metadata or {}
+    metadata = document.metadata_dict or {}
     if payload.source_url:
         metadata["source_url"] = payload.source_url
     if payload.metadata:
         metadata.update(payload.metadata)
-    document.metadata = metadata
+    metadata["size_bytes"] = size
+    document.metadata_dict = metadata
+    document.content_type = stored_content_type
     document.updated_at = datetime.now(timezone.utc)
 
     job = Job(
@@ -267,7 +317,48 @@ def _to_document_response(document: Document, chunk_count: int) -> DocumentRespo
         created_at=document.created_at,
         updated_at=document.updated_at,
         text_preview=document.text_preview,
-        metadata=document.metadata,
+        metadata=document.metadata_dict,
         error=document.error,
         chunk_count=chunk_count,
     )
+
+
+def _validate_content_type(content_type: str) -> str:
+    normalized = (content_type or "application/octet-stream").split(";", 1)[0].strip().lower()
+    if normalized not in ALLOWED_UPLOAD_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported file type",
+        )
+    return normalized
+
+
+def _ensure_within_size_limit(size: int) -> None:
+    if size <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded object is empty",
+        )
+    if size > settings.UPLOAD_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Uploaded object exceeds size limit",
+        )
+
+
+async def _stat_uploaded_object(document: Document) -> tuple[int, str]:
+    client = get_minio_client()
+    try:
+        stat = await run_in_threadpool(
+            client.stat_object,
+            settings.MINIO_BUCKET,
+            document.uri,
+        )
+    except Exception as exc:  # pragma: no cover - network errors
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded object not found",
+        ) from exc
+    size = int(getattr(stat, "size", 0) or 0)
+    content_type = getattr(stat, "content_type", document.content_type or "")
+    return size, content_type

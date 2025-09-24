@@ -38,11 +38,11 @@ class Message(Base):
         return f"Message(id={self.id!s}, conversation_id={self.conversation_id!s}, role={self.role!r})"
 
     @property
-    def metadata(self) -> dict | None:
+    def metadata_dict(self) -> dict | None:
         """Expose message metadata while avoiding attribute name clashes."""
 
         return self.metadata_
 
-    @metadata.setter
-    def metadata(self, value: dict | None) -> None:
+    @metadata_dict.setter
+    def metadata_dict(self, value: dict | None) -> None:
         self.metadata_ = value
