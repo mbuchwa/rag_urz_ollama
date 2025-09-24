@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from pydantic import BaseModel
+
 from ..auth import get_oidc_client
 from ..core.config import settings
 from ..core.db import get_session
@@ -19,6 +21,13 @@ from ..models import NamespaceMember, User
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
+
+
+class LocalLoginRequest(BaseModel):
+    """Request payload for the development local login flow."""
+
+    email: str
+    password: str
 
 
 @router.get("/login", summary="Initiate OIDC login")
@@ -145,6 +154,38 @@ async def logout(request: Request) -> JSONResponse:
         samesite="lax",
     )
     return response
+
+
+@router.post("/local-login", summary="Authenticate with a development account")
+async def local_login(
+    payload: LocalLoginRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> JSONResponse:
+    """Allow development logins using static credentials."""
+
+    if not settings.LOCAL_LOGIN_ENABLED:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    expected_email = settings.LOCAL_LOGIN_EMAIL.strip().lower()
+    expected_password = settings.LOCAL_LOGIN_PASSWORD
+
+    provided_email = payload.email.strip().lower()
+    if provided_email != expected_email or payload.password != expected_password:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+
+    user = await _upsert_user(
+        session,
+        sub=f"local:{expected_email}",
+        email=expected_email,
+        display_name=payload.email,
+    )
+
+    request.session.clear()
+    request.session["user_id"] = str(user.id)
+    request.session["csrf_token"] = secrets.token_urlsafe(32)
+
+    return JSONResponse({"detail": "Logged in"})
 
 
 async def _extract_claims(oauth: Any, request: Request, token: dict[str, Any]) -> dict[str, Any]:

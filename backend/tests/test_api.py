@@ -16,6 +16,34 @@ from backend.app.models.documents import DocumentStatus
 from backend.app.rag import ollama_client, retrieval
 
 
+def test_local_login_success(app: Any) -> None:
+    response = app.post(
+        "/auth/local-login",
+        json={"email": settings.LOCAL_LOGIN_EMAIL, "password": settings.LOCAL_LOGIN_PASSWORD},
+    )
+    assert response.status_code == 200
+    assert response.json()["detail"] == "Logged in"
+
+    session_cookie = response.cookies.get(settings.SESSION_COOKIE_NAME)
+    assert session_cookie
+
+    app.cookies.set(settings.SESSION_COOKIE_NAME, session_cookie)
+    me_response = app.get("/auth/me")
+    assert me_response.status_code == 200
+    me_payload = me_response.json()
+    assert me_payload["user"]["email"] == settings.LOCAL_LOGIN_EMAIL
+
+
+def test_local_login_rejects_bad_credentials(app: Any) -> None:
+    response = app.post(
+        "/auth/local-login",
+        json={"email": settings.LOCAL_LOGIN_EMAIL, "password": "wrong"},
+    )
+    assert response.status_code == 401
+    body = response.json()
+    assert body["detail"] == "Invalid email or password"
+
+
 def test_auth_guard_requires_session(app: Any) -> None:
     response = app.post(
         "/api/docs/upload-init",

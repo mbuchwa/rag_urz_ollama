@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     SESSION_COOKIE_NAME: str = Field(default="rag_session")
     SESSION_COOKIE_SECURE: bool = Field(default=True)
 
+    LOCAL_LOGIN_ENABLED: bool = Field(default=True)
+    LOCAL_LOGIN_EMAIL: str = Field(default="test@uni-heidelberg.de")
+    LOCAL_LOGIN_PASSWORD: str = Field(default="testtest")
+
     OLLAMA_HOST: str = Field(default="http://host.docker.internal:11434")
     OLLAMA_MODEL: str = Field(default="gpt-oss-20b")
     OLLAMA_TIMEOUT: float = Field(default=120.0)
