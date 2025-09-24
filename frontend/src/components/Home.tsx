@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../context/AuthContext'
+import { apiUrl } from '../utils/api'
 import logo from '/imgs/logo.png'
 import chatbotLogo from '/imgs/chatbot_psy.png'
 import QueryInterface from './QueryInterface'
@@ -57,7 +58,7 @@ export default function Home() {
     }
     setDocsLoading(true)
     try {
-      const res = await fetch(`/api/docs?namespace_id=${namespace.id}`, { credentials: 'include' })
+      const res = await fetch(apiUrl(`/api/docs?namespace_id=${namespace.id}`), { credentials: 'include' })
       if (!res.ok) {
         throw new Error(`Failed to load documents (${res.status})`)
       }
@@ -131,7 +132,7 @@ export default function Home() {
       payload.conversation_id = conversationId
     }
 
-    const res = await fetch('/api/chat/start', {
+    const res = await fetch(apiUrl('/api/chat/start'), {
       method: 'POST',
       headers,
       credentials: 'include',
@@ -168,7 +169,7 @@ export default function Home() {
           q: text,
         })
 
-        const res = await fetch(`/api/chat/stream?${params.toString()}`, {
+        const res = await fetch(apiUrl(`/api/chat/stream?${params.toString()}`), {
           method: 'GET',
           headers: {
             Accept: 'text/event-stream',
@@ -317,7 +318,7 @@ export default function Home() {
         return
       }
       try {
-        const res = await fetch(`/api/docs/${id}`, {
+        const res = await fetch(apiUrl(`/api/docs/${id}`), {
           method: 'DELETE',
           credentials: 'include',
           headers: {

@@ -8,6 +8,8 @@ import {
   useState,
 } from 'react'
 
+import { apiUrl } from '../utils/api'
+
 type Namespace = {
   id: string
   slug: string
@@ -41,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchMe = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/auth/me', { credentials: 'include' })
+      const res = await fetch(apiUrl('/auth/me'), { credentials: 'include' })
       if (!res.ok) {
         setUser(null)
         setNamespaces([])
@@ -91,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (csrfToken) {
         headers['X-CSRF-Token'] = csrfToken
       }
-      await fetch('/auth/logout', {
+      await fetch(apiUrl('/auth/logout'), {
         method: 'POST',
         headers,
         credentials: 'include',
