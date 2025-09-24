@@ -20,3 +20,4 @@ torch==2.4.0
 numpy==1.26.4
 pytest==8.3.3
 pytest-asyncio==0.23.8
+itsdangerous>=2.1
