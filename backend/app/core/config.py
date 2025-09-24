@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL_NAME: str = Field(default="sentence-transformers/all-MiniLM-L6-v2")
     EMBEDDING_DIM: int = Field(default=1536)
 
+    RETRIEVAL_TOP_K: int = Field(default=5)
+    RETRIEVAL_USE_RERANKER: bool = Field(default=False)
+    RERANKER_CANDIDATE_MULTIPLIER: int = Field(default=3)
+
     OIDC_CLIENT_ID: str = Field(default="client-id")
     OIDC_CLIENT_SECRET: str = Field(default="client-secret")
     OIDC_ISSUER: str = Field(default="https://example.com/oidc")
@@ -37,6 +41,10 @@ class Settings(BaseSettings):
     SESSION_COOKIE_SECURE: bool = Field(default=True)
 
     OLLAMA_HOST: str = Field(default="http://ollama:11434")
+    OLLAMA_MODEL: str = Field(default="gpt-oss-20b")
+    OLLAMA_TIMEOUT: float = Field(default=120.0)
+
+    CHAT_HISTORY_LIMIT: int = Field(default=12)
 
     model_config = {
         "env_file": ".env",
