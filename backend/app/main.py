@@ -1,6 +1,5 @@
 """FastAPI application entry point for the RAG platform."""
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -20,13 +19,6 @@ def create_app() -> FastAPI:
 
     app.add_middleware(SlowAPIMiddleware)
     app.add_middleware(AuthenticatedSessionMiddleware, api_prefix="/api")
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[settings.FRONTEND_URL.rstrip("/")],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
     app.add_middleware(
         SessionMiddleware,
         secret_key=settings.SESSION_SECRET,
