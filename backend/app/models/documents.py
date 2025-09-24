@@ -54,16 +54,6 @@ class Document(Base):
     chunks = relationship("Chunk", back_populates="document", cascade="all, delete-orphan")
 
     @property
-    def metadata(self) -> dict | None:
-        """Return document metadata stored in the JSONB column."""
-
-        return self.metadata_
-
-    @metadata.setter
-    def metadata(self, value: dict | None) -> None:
-        self.metadata_ = value
-
-    @property
     def is_deleted(self) -> bool:
         """Return whether the document has been soft deleted."""
 
@@ -74,3 +64,13 @@ class Document(Base):
 
         self.status = DocumentStatus.DELETED.value
         self.deleted_at = datetime.now(timezone.utc)
+    @property
+    def metadata_dict(self) -> dict | None:
+        """Return document metadata stored in the JSONB column."""
+
+        return self.metadata_
+
+    @metadata_dict.setter
+    def metadata_dict(self, value: dict | None) -> None:
+        self.metadata_ = value
+

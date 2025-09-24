@@ -40,7 +40,7 @@ def _build_query_statement(vector: Sequence[float], namespace_id: uuid.UUID, lim
             Chunk.id.label("chunk_id"),
             Chunk.document_id.label("document_id"),
             Chunk.text.label("text"),
-            Chunk.metadata.label("metadata"),
+            Chunk.metadata_.label("metadata"),
             Chunk.ordinal.label("ordinal"),
             Document.title.label("title"),
             distance.label("distance"),

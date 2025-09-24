@@ -163,9 +163,9 @@ class _Crawler:
                     self.summary.skipped += 1
                     self.session.commit()
                     if content_type in HTML_TYPES and depth < self.max_depth:
-                    html_text = response.text
-                    links = self._extract_links(html_text, normalized_final)
-                    self._enqueue_links(queue, links, depth + 1)
+                        html_text = response.text
+                        links = self._extract_links(html_text, normalized_final)
+                        self._enqueue_links(queue, links, depth + 1)
                     continue
 
                 try:
@@ -287,7 +287,7 @@ class _Crawler:
             uri="",
             title=title,
             content_type=content_type,
-            metadata={
+            metadata_dict={
                 "source_url": url,
                 "original_filename": filename,
                 "crawl_job_id": str(self.job_id),

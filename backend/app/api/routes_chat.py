@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from ..core.config import settings
 from ..core.db import SessionLocal, get_session
+from ..core.rate_limiter import limiter
 from ..models import Conversation, Message, NamespaceMember
 from ..rag import ollama_client, retrieval
 
@@ -144,6 +145,7 @@ def _sse_payload(data: Dict[str, Any]) -> str:
 
 
 @router.get("/stream", summary="Stream chat completions over SSE")
+@limiter.limit(settings.RATE_LIMIT_CHAT_STREAM)
 async def chat_stream(
     request: Request,
     conversation_id: uuid.UUID = Query(...),
@@ -230,7 +232,7 @@ async def chat_stream(
                 role="assistant",
                 content=response_text,
             )
-            assistant_message.metadata = {
+            assistant_message.metadata_dict = {
                 "citations": [citation.model_dump() for citation in citations]
             }
             write_session.add(assistant_message)

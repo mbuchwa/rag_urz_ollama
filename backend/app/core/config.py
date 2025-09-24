@@ -46,6 +46,22 @@ class Settings(BaseSettings):
 
     CHAT_HISTORY_LIMIT: int = Field(default=12)
 
+    UPLOAD_MAX_BYTES: int = Field(default=25 * 1024 * 1024)
+    UPLOAD_ALLOWED_MIME_TYPES: tuple[str, ...] = Field(
+        default=(
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain",
+            "text/html",
+            "application/xhtml+xml",
+        )
+    )
+
+    RATE_LIMIT_CHAT_STREAM: str = Field(default="30/minute")
+    RATE_LIMIT_INGESTION: str = Field(default="12/minute")
+    RATE_LIMIT_CRAWL: str = Field(default="4/hour")
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
