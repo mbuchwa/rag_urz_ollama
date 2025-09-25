@@ -339,6 +339,45 @@ export default function Home() {
     [csrfToken, fetchDocuments],
   )
 
+  const handleDeleteAll = useCallback(async () => {
+    if (!csrfToken) {
+      console.warn('Missing CSRF token for deletion')
+      return
+    }
+    if (documents.length === 0) {
+      return
+    }
+    const confirmed = window.confirm('Are you sure you want to delete all documents?')
+    if (!confirmed) {
+      return
+    }
+    setDocsLoading(true)
+    try {
+      const results = await Promise.allSettled(
+        documents.map((doc) =>
+          fetch(apiUrl(`/api/docs/${doc.id}`), {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': csrfToken,
+            },
+            body: '{}',
+          }),
+        ),
+      )
+      const hasFailure = results.some((result) => result.status === 'rejected' || !result.value?.ok)
+      if (hasFailure) {
+        console.error('Failed to delete one or more documents')
+      }
+      await fetchDocuments()
+    } catch (error) {
+      console.error('Failed to delete all documents', error)
+    } finally {
+      setDocsLoading(false)
+    }
+  }, [csrfToken, documents, fetchDocuments])
+
   const handleRefresh = useCallback(() => {
     void fetchDocuments()
   }, [fetchDocuments])
@@ -468,7 +507,13 @@ export default function Home() {
             <div className="mx-auto flex flex-col gap-6">
               <Upload namespaceId={namespace.id} csrfToken={csrfToken} onUploaded={handleUploadComplete} />
               <CrawlJobs namespaceId={namespace.id} csrfToken={csrfToken} />
-              <Library documents={documents} loading={docsLoading} onRefresh={handleRefresh} onDelete={handleDelete} />
+              <Library
+                documents={documents}
+                loading={docsLoading}
+                onRefresh={handleRefresh}
+                onDelete={handleDelete}
+                onDeleteAll={handleDeleteAll}
+              />
             </div>
           ) : (
             <div className="rounded-2xl bg-white/90 p-6 text-center text-sm text-gray-600 shadow">
