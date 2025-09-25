@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
 import Home from './components/Home'
@@ -11,12 +12,42 @@ export default function App() {
   const { namespaces } = useAuth()
   const { background } = getClientAssets(namespaces[0]?.slug)
 
+  useEffect(() => {
+    const bodyStyle = document.body.style
+    const previous = {
+      backgroundImage: bodyStyle.backgroundImage,
+      backgroundSize: bodyStyle.backgroundSize,
+      backgroundPosition: bodyStyle.backgroundPosition,
+      backgroundRepeat: bodyStyle.backgroundRepeat,
+      backgroundAttachment: bodyStyle.backgroundAttachment,
+    }
+
+    if (background) {
+      bodyStyle.backgroundImage = `url(${background})`
+      bodyStyle.backgroundSize = 'cover'
+      bodyStyle.backgroundPosition = 'center'
+      bodyStyle.backgroundRepeat = 'no-repeat'
+      bodyStyle.backgroundAttachment = 'fixed'
+    } else {
+      bodyStyle.backgroundImage = ''
+      bodyStyle.backgroundSize = ''
+      bodyStyle.backgroundPosition = ''
+      bodyStyle.backgroundRepeat = ''
+      bodyStyle.backgroundAttachment = ''
+    }
+
+    return () => {
+      bodyStyle.backgroundImage = previous.backgroundImage
+      bodyStyle.backgroundSize = previous.backgroundSize
+      bodyStyle.backgroundPosition = previous.backgroundPosition
+      bodyStyle.backgroundRepeat = previous.backgroundRepeat
+      bodyStyle.backgroundAttachment = previous.backgroundAttachment
+    }
+  }, [background])
+
   return (
     <BrowserRouter>
-      <div
-        className="flex min-h-screen flex-col bg-cover bg-center"
-        style={background ? { backgroundImage: `url(${background})` } : undefined}
-      >
+      <div className="flex min-h-screen flex-col">
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/callback" element={<Callback />} />
