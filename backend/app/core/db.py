@@ -1,7 +1,6 @@
 """Database utilities for SQLAlchemy and Alembic."""
 from __future__ import annotations
 
-from contextlib import contextmanager
 from typing import Generator
 
 from sqlalchemy import Engine, create_engine
@@ -22,7 +21,6 @@ SessionLocal = sessionmaker[
 ](bind=ENGINE, autoflush=False, autocommit=False, expire_on_commit=False)
 
 
-@contextmanager
 def get_session() -> Generator[Session, None, None]:
     """Provide a transactional scope around a series of operations."""
 
