@@ -8,10 +8,11 @@ from typing import Any
 
 import pytest
 
+from backend.app.api import routes_crawl
 from backend.app.api.routes_docs import UploadCompleteRequest
 from backend.app.core.config import settings
 from backend.app.ingest import crawler as crawler_module
-from backend.app.models import Conversation, Document, Job, Namespace, NamespaceMember, User
+from backend.app.models import Conversation, CrawlResult, Document, Job, Namespace, NamespaceMember, User
 from backend.app.models.documents import DocumentStatus
 from backend.app.rag import ollama_client, retrieval
 
@@ -178,6 +179,59 @@ def test_upload_ingest_happy_path(
     recorded_document_id, recorded_job_id = ingest_calls[0]
     assert recorded_document_id == str(document_id)
     assert recorded_job_id == str(job_id)
+
+
+def test_delete_crawl_job_revokes_and_removes_records(
+    app: Any,
+    session_factory,
+    auth_session: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    namespace_id = uuid.uuid4()
+    job_id = uuid.uuid4()
+    user_id = uuid.UUID(auth_session["user_id"])
+
+    with session_factory() as session:
+        user = User(id=user_id, email="crawler@example.com")
+        namespace = Namespace(id=namespace_id, slug="crawler", name="Crawler")
+        membership = NamespaceMember(namespace_id=namespace_id, user_id=user_id)
+        job = Job(
+            id=job_id,
+            namespace_id=namespace_id,
+            task_type="crawl",
+            status="running",
+            payload={"url": "https://example.com", "depth": 2, "task_id": "celery-123"},
+        )
+        result = CrawlResult(
+            job_id=job_id,
+            url="https://example.com/page",
+            depth=0,
+            status="harvested",
+        )
+        session.add_all([user, namespace, membership, job, result])
+        session.commit()
+
+    revoke_calls: list[tuple[str, bool]] = []
+
+    def _revoke(task_id: str, *, terminate: bool = False) -> None:
+        revoke_calls.append((task_id, terminate))
+
+    monkeypatch.setattr(routes_crawl.celery_app.control, "revoke", _revoke)
+
+    client = app
+    client.cookies.set(settings.SESSION_COOKIE_NAME, auth_session["cookie"])
+    headers = {"X-CSRF-Token": auth_session["csrf_token"]}
+
+    response = client.delete(f"/api/crawl/{job_id}", headers=headers)
+    assert response.status_code == 204
+    assert response.content == b""
+
+    with session_factory() as session:
+        assert session.get(Job, job_id) is None
+        remaining = session.query(CrawlResult).filter(CrawlResult.job_id == job_id).all()
+        assert not remaining
+
+    assert revoke_calls == [("celery-123", True)]
 
 
 def test_crawl_depth_restriction() -> None:
