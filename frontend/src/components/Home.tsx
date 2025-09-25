@@ -19,9 +19,8 @@ import Library, { type DocumentRecord } from './Library'
 const THINKING_ENABLED = import.meta.env.VITE_ENABLE_MODEL_THINKING === 'true'
 
 const DEFAULT_EXAMPLE_PROMPTS = [
-  'How do I connect to Eduroam?',
-  'Wie erhalte ich eine Microsoft-Lizenz?',
-  'How to setup MFA Token?',
+  'What can I use you for?',
+  'Where to apply for the Bachelors program?',
 ]
 
 const EXAMPLE_PROMPTS_BY_NAMESPACE: Record<string, string[]> = {
