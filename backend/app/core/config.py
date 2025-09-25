@@ -66,8 +66,8 @@ class Settings(BaseSettings):
     RATE_LIMIT_INGESTION: str = Field(default="12/minute")
     RATE_LIMIT_CRAWL: str = Field(default="4/hour")
 
-    DEFAULT_NAMESPACE_SLUG: str = Field(default="default")
-    DEFAULT_NAMESPACE_NAME: str | None = Field(default="Default Namespace")
+    DEFAULT_NAMESPACE_SLUG: str = Field(default="psychology")
+    DEFAULT_NAMESPACE_NAME: str | None = Field(default="Psychology")
 
     model_config = {
         "env_file": ".env",
