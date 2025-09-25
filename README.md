@@ -1,6 +1,6 @@
 <p align="center">
-  <img src="frontend/imgs/logo.png" alt="URZ logo" height="80" />
-  <img src="frontend/imgs/chatbot_logo.png" alt="Chatbot logo" height="80" />
+  <img src="frontend/imgs/urz/logo.png" alt="URZ logo" height="80" />
+  <img src="frontend/imgs/urz/chatbot_logo.png" alt="Chatbot logo" height="80" />
 </p>
 
 # URZ RAG Platform
