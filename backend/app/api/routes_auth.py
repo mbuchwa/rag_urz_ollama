@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from ..auth import get_oidc_client
 from ..core.config import settings
 from ..core.db import get_session
-from ..models import NamespaceMember, User
+from ..models import Namespace, NamespaceMember, User
 
 router = APIRouter()
 
@@ -225,4 +225,18 @@ async def _upsert_user(
             user.oidc_sub = sub
 
     session.flush()
+    if not user.namespaces:
+        slug = settings.DEFAULT_NAMESPACE_SLUG.strip()
+        if slug:
+            stmt = select(Namespace).where(Namespace.slug == slug)
+            namespace = session.execute(stmt).scalar_one_or_none()
+            if namespace is None:
+                namespace_name = settings.DEFAULT_NAMESPACE_NAME or slug.replace("-", " ").title()
+                namespace = Namespace(slug=slug, name=namespace_name)
+                session.add(namespace)
+                session.flush()
+
+            membership = NamespaceMember(namespace=namespace, user=user)
+            session.add(membership)
+            session.flush()
     return user
