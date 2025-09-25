@@ -4,14 +4,18 @@ import Home from './components/Home'
 import Callback from './pages/Callback'
 import Login from './pages/Login'
 import ProtectedRoute from './pages/ProtectedRoute'
-import background from '/imgs/background.jpg'
+import { useAuth } from './context/AuthContext'
+import { getClientAssets } from './utils/clientAssets'
 
 export default function App() {
+  const { namespaces } = useAuth()
+  const { background } = getClientAssets(namespaces[0]?.slug)
+
   return (
     <BrowserRouter>
       <div
         className="flex min-h-screen flex-col bg-cover bg-center"
-        style={{ backgroundImage: `url(${background})` }}
+        style={background ? { backgroundImage: `url(${background})` } : undefined}
       >
         <Routes>
           <Route path="/login" element={<Login />} />
