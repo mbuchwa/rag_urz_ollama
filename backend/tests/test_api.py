@@ -34,6 +34,61 @@ def test_local_login_success(app: Any) -> None:
     assert me_payload["user"]["email"] == settings.LOCAL_LOGIN_EMAIL
 
 
+def test_local_login_assigns_default_namespace(app: Any, session_factory) -> None:
+    response = app.post(
+        "/auth/local-login",
+        json={"email": settings.LOCAL_LOGIN_EMAIL, "password": settings.LOCAL_LOGIN_PASSWORD},
+    )
+    assert response.status_code == 200
+
+    session_cookie = response.cookies.get(settings.SESSION_COOKIE_NAME)
+    assert session_cookie
+    app.cookies.set(settings.SESSION_COOKIE_NAME, session_cookie)
+
+    me_response = app.get("/auth/me")
+    assert me_response.status_code == 200
+    me_payload = me_response.json()
+    csrf_token = me_payload["csrf_token"]
+    assert csrf_token
+
+    namespaces = me_payload["namespaces"]
+    assert namespaces
+    assert len(namespaces) == 1
+
+    default_namespace = namespaces[0]
+    assert default_namespace["slug"] == settings.DEFAULT_NAMESPACE_SLUG
+    expected_name = settings.DEFAULT_NAMESPACE_NAME or settings.DEFAULT_NAMESPACE_SLUG.replace("-", " ").title()
+    assert default_namespace["name"] == expected_name
+
+    headers = {"X-CSRF-Token": csrf_token}
+    chat_response = app.post(
+        "/api/chat/start",
+        json={"namespace_id": default_namespace["id"], "conversation_id": None},
+        headers=headers,
+    )
+    assert chat_response.status_code == 200
+    assert chat_response.json()["conversation_id"]
+
+    upload_response = app.post(
+        "/api/docs/upload-init",
+        json={
+            "namespace_id": default_namespace["id"],
+            "filename": "guide.pdf",
+            "content_type": "application/pdf",
+        },
+        headers=headers,
+    )
+    assert upload_response.status_code == 200
+
+    with session_factory() as session:
+        user = session.query(User).filter(User.email == settings.LOCAL_LOGIN_EMAIL).one()
+        memberships = session.query(NamespaceMember).filter(NamespaceMember.user_id == user.id).all()
+        assert len(memberships) == 1
+        namespace = session.get(Namespace, memberships[0].namespace_id)
+        assert namespace is not None
+        assert namespace.slug == settings.DEFAULT_NAMESPACE_SLUG
+
+
 def test_local_login_rejects_bad_credentials(app: Any) -> None:
     response = app.post(
         "/auth/local-login",
