@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../context/AuthContext'
 import { apiUrl } from '../utils/api'
-import logo from '/imgs/logo.png'
-import chatbotLogo from '/imgs/chatbot_psy.png'
+import { getClientAssets } from '../utils/clientAssets'
 import QueryInterface from './QueryInterface'
 import ResponseDisplay, {
   type Message as DisplayMessage,
@@ -41,6 +40,8 @@ export default function Home() {
   const [docsLoading, setDocsLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [selectedSource, setSelectedSource] = useState<Citation | null>(null)
+
+  const { logo, chatbotLogo } = getClientAssets(namespace?.slug ?? namespaces[0]?.slug)
 
   useEffect(() => {
     setNamespaceId((prev) => {
@@ -360,8 +361,8 @@ export default function Home() {
       />
       <header className="mb-6 flex flex-col items-center gap-2 rounded bg-white px-6 py-4 shadow">
         <div className="flex items-center gap-4">
-          <img src={logo} alt="Heidelberg University" className="h-20" />
-          <img src={chatbotLogo} alt="Chatbot Logo" className="h-20" />
+          {logo ? <img src={logo} alt="Client Logo" className="h-20" /> : null}
+          {chatbotLogo ? <img src={chatbotLogo} alt="Chatbot Logo" className="h-20" /> : null}
         </div>
         <h1 className="text-center text-2xl font-semibold">
           IT Chatbot of the Computing Centre of Heidelberg University

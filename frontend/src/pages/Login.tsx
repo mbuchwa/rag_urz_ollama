@@ -3,11 +3,10 @@ import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../context/AuthContext'
 import { apiUrl } from '../utils/api'
-
-import chatbotLogo from '/imgs/chatbot_psy.png'
+import { getClientAssets } from '../utils/clientAssets'
 
 export default function Login() {
-  const { user, loading, refresh } = useAuth()
+  const { user, loading, refresh, namespaces } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('test@uni-heidelberg.de')
   const [password, setPassword] = useState('')
@@ -57,6 +56,8 @@ export default function Login() {
       setSubmitting(false)
     }
   }
+
+  const { chatbotLogo } = getClientAssets(namespaces[0]?.slug)
 
   return (
     <div className="login-page">
