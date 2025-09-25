@@ -127,7 +127,7 @@ export default function Library({ documents, loading, onRefresh, onDelete, onDel
         </div>
       )}
 
-      {loading && (
+      {loading && documents.length === 0 && (
         <div className="mt-4 text-center text-sm text-gray-500">Loading documents…</div>
       )}
     </section>

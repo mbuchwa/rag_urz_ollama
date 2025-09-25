@@ -65,12 +65,15 @@ export default function Home() {
     })
   }, [namespaces])
 
-  const fetchDocuments = useCallback(async () => {
+  const fetchDocuments = useCallback(async (options: { showLoading?: boolean } = {}) => {
     if (!namespace) {
       setDocuments([])
       return
     }
-    setDocsLoading(true)
+    const shouldShowLoading = options.showLoading ?? documents.length === 0
+    if (shouldShowLoading) {
+      setDocsLoading(true)
+    }
     try {
       const res = await fetch(apiUrl(`/api/docs?namespace_id=${namespace.id}`), { credentials: 'include' })
       if (!res.ok) {
@@ -101,7 +104,7 @@ export default function Home() {
     } finally {
       setDocsLoading(false)
     }
-  }, [namespace])
+  }, [documents.length, namespace])
 
   useEffect(() => {
     if (activeTab !== 'library') return
@@ -392,7 +395,7 @@ export default function Home() {
   }, [csrfToken, documents, fetchDocuments])
 
   const handleRefresh = useCallback(() => {
-    void fetchDocuments()
+    void fetchDocuments({ showLoading: true })
   }, [fetchDocuments])
 
   const handleUploadComplete = useCallback(() => {
