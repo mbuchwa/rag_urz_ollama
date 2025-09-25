@@ -4,7 +4,7 @@ type ClientAssets = {
   chatbotLogo: string | null
 }
 
-const DEFAULT_CLIENT_SLUG = 'urz'
+const DEFAULT_CLIENT_SLUG = 'psychology'
 
 const assetModules = import.meta.glob('../../imgs/*/*.{png,jpg,jpeg,JPG,JPEG}', {
   eager: true,
