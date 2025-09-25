@@ -17,6 +17,7 @@ type LibraryProps = {
   loading: boolean
   onRefresh: () => void
   onDelete: (id: string) => void
+  onDeleteAll: () => void
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -37,7 +38,7 @@ const STATUS_STYLES: Record<string, string> = {
   deleted: 'bg-gray-200 text-gray-600',
 }
 
-export default function Library({ documents, loading, onRefresh, onDelete }: LibraryProps) {
+export default function Library({ documents, loading, onRefresh, onDelete, onDeleteAll }: LibraryProps) {
   const formatter = useMemo(() => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }), [])
 
   return (
@@ -47,14 +48,24 @@ export default function Library({ documents, loading, onRefresh, onDelete }: Lib
           <h2 className="text-lg font-semibold text-gray-800">Document library</h2>
           <p className="text-sm text-gray-500">Monitor ingestion status and manage uploaded documents.</p>
         </div>
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="self-start rounded-full border border-[#b52230] px-4 py-2 text-sm font-medium text-[#b52230] transition hover:bg-[#b52230] hover:text-white disabled:opacity-60"
-          disabled={loading}
-        >
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={onDeleteAll}
+            className="self-start rounded-full border border-red-300 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={loading || documents.length === 0}
+          >
+            Empty documents
+          </button>
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="self-start rounded-full border border-[#b52230] px-4 py-2 text-sm font-medium text-[#b52230] transition hover:bg-[#b52230] hover:text-white disabled:opacity-60"
+            disabled={loading}
+          >
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
       </header>
 
       {documents.length === 0 && !loading && (
