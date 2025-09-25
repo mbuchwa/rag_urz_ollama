@@ -68,9 +68,10 @@ export default function Library({ documents, loading, onRefresh, onDelete, onDel
         </div>
       </header>
 
-      {documents.length === 0 && !loading && (
+      {documents.length === 0 && (
         <div className="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-sm text-gray-500">
-          No documents uploaded yet. Use the uploader above to ingest your first document.
+          <p>No documents uploaded yet. Use the uploader above to ingest your first document.</p>
+          {loading && <p className="mt-3 text-xs text-gray-400">Refreshing…</p>}
         </div>
       )}
 
@@ -127,8 +128,8 @@ export default function Library({ documents, loading, onRefresh, onDelete, onDel
         </div>
       )}
 
-      {loading && documents.length === 0 && (
-        <div className="mt-4 text-center text-sm text-gray-500">Loading documents…</div>
+      {loading && documents.length > 0 && (
+        <div className="mt-4 text-center text-sm text-gray-500">Refreshing documents…</div>
       )}
     </section>
   )
