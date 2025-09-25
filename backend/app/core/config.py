@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     MINIO_ACCESS_KEY: str = Field(default="minioadmin")
     MINIO_SECRET_KEY: str = Field(default="minioadmin")
     MINIO_BUCKET: str = Field(default="rag-data")
+    MINIO_PUBLIC_ENDPOINT: str | None = Field(default=None)
 
     EMBEDDING_MODEL_NAME: str = Field(default="sentence-transformers/all-MiniLM-L6-v2")
     EMBEDDING_DIM: int = Field(default=1536)
