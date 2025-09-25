@@ -118,11 +118,20 @@ async def read_current_user(
         namespace = membership.namespace
         if not namespace:
             continue
+
+        raw_name = (namespace.name or "").strip()
+        if not raw_name or raw_name.lower() == "default namespace":
+            fallback_name = settings.DEFAULT_NAMESPACE_NAME
+            if not fallback_name:
+                slug = (namespace.slug or "").strip()
+                fallback_name = slug.replace("-", " ").title() if slug else None
+            raw_name = fallback_name or "Namespace"
+
         namespaces.append(
             {
                 "id": str(namespace.id),
                 "slug": namespace.slug,
-                "name": namespace.name,
+                "name": raw_name,
                 "role": membership.role,
             }
         )
