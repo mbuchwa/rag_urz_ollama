@@ -18,11 +18,18 @@ import Library, { type DocumentRecord } from './Library'
 
 const THINKING_ENABLED = import.meta.env.VITE_ENABLE_MODEL_THINKING === 'true'
 
-const EXAMPLE_PROMPTS = [
+const DEFAULT_EXAMPLE_PROMPTS = [
   'How do I connect to Eduroam?',
   'Wie erhalte ich eine Microsoft-Lizenz?',
   'How to setup MFA Token?',
 ]
+
+const EXAMPLE_PROMPTS_BY_NAMESPACE: Record<string, string[]> = {
+  psychology: [
+    'What can I use you for?',
+    'Where to apply for the Bachelors program?',
+  ],
+}
 
 export default function Home() {
   const { csrfToken, namespaces } = useAuth()
@@ -31,6 +38,12 @@ export default function Home() {
     () => namespaces.find((ns) => ns.id === namespaceId) ?? null,
     [namespaces, namespaceId],
   )
+  const examplePrompts = useMemo(() => {
+    const slug = namespace?.slug ?? namespaces[0]?.slug
+    if (!slug) return DEFAULT_EXAMPLE_PROMPTS
+    const normalized = slug.toLowerCase()
+    return EXAMPLE_PROMPTS_BY_NAMESPACE[normalized] ?? DEFAULT_EXAMPLE_PROMPTS
+  }, [namespace, namespaces])
   const [activeTab, setActiveTab] = useState<'chat' | 'library'>('chat')
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [loading, setLoading] = useState(false)
@@ -471,7 +484,7 @@ export default function Home() {
                   <span className="font-medium">Vorgeschlagen</span>
                 </div>
                 <div className="space-y-3">
-                  {EXAMPLE_PROMPTS.map((p) => (
+                  {examplePrompts.map((p) => (
                     <button
                       key={p}
                       onClick={() => handleSend(p)}
