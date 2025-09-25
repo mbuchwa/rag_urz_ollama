@@ -6,6 +6,7 @@ import mimetypes
 import re
 import uuid
 from datetime import datetime, timezone, timedelta
+from urllib.parse import urlparse, urlunparse
 from typing import Any, Iterable, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -92,6 +93,37 @@ def _build_object_key(namespace_id: uuid.UUID, document_id: uuid.UUID, filename:
     return f"uploads/{namespace_id}/{document_id}/{filename}"
 
 
+def _externalize_presigned_url(url: str) -> str:
+    """Rewrite a presigned URL to use the configured public MinIO endpoint."""
+
+    public_endpoint = settings.MINIO_PUBLIC_ENDPOINT
+    if not public_endpoint:
+        return url
+
+    normalized_endpoint = (
+        public_endpoint
+        if "://" in public_endpoint
+        else f"https://{public_endpoint}"
+    )
+    parsed_public = urlparse(normalized_endpoint)
+    netloc = parsed_public.netloc or parsed_public.path
+    if not netloc:
+        return url
+
+    parsed_url = urlparse(url)
+    scheme = parsed_public.scheme or parsed_url.scheme or "https"
+    base_path = parsed_public.path.rstrip("/")
+    path = f"{base_path}{parsed_url.path}" if base_path else parsed_url.path
+
+    return urlunparse(
+        parsed_url._replace(
+            scheme=scheme,
+            netloc=netloc,
+            path=path,
+        )
+    )
+
+
 def _require_user_id(request: Request) -> uuid.UUID:
     raw_user_id = getattr(request.state, "user_id", None)
     if not raw_user_id:
@@ -164,6 +196,7 @@ async def upload_init(
         object_key,
         expires=timedelta(minutes=15),
     )
+    upload_url = _externalize_presigned_url(upload_url)
 
     logger.info("Initialized upload for document %s in namespace %s", document.id, payload.namespace_id)
     return UploadInitResponse(document_id=document.id, upload_url=upload_url)
