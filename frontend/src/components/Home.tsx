@@ -419,7 +419,7 @@ export default function Home() {
           {chatbotLogo ? <img src={chatbotLogo} alt="Chatbot Logo" className="h-20" /> : null}
         </div>
         <h1 className="text-center text-2xl font-semibold">
-          IT Chatbot of the Computing Centre of Heidelberg University
+          IT Chatbot for the Faculty of Psychology powered by URZ
         </h1>
       </header>
 
