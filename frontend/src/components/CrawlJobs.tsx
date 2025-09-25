@@ -65,6 +65,7 @@ export default function CrawlJobs({ namespaceId, csrfToken }: CrawlJobsProps) {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
   const [results, setResults] = useState<Record<string, CrawlResult[]>>({})
   const [detailsLoading, setDetailsLoading] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const formatter = useMemo(
     () => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }),
@@ -199,6 +200,53 @@ export default function CrawlJobs({ namespaceId, csrfToken }: CrawlJobsProps) {
     [csrfToken, rootUrl, depth, namespaceId, fetchJobs],
   )
 
+  const handleDelete = useCallback(
+    async (jobId: string) => {
+      if (!csrfToken) {
+        setError('Missing CSRF token, please refresh the page and try again.')
+        return
+      }
+      const confirmed = window.confirm('Delete this crawl job? This cannot be undone.')
+      if (!confirmed) {
+        return
+      }
+      setDeletingId(jobId)
+      setError(null)
+      try {
+        const res = await fetch(apiUrl(`/api/crawl/${jobId}`), {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: {
+            'X-CSRF-Token': csrfToken,
+          },
+        })
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}))
+          const detail =
+            typeof payload?.detail === 'string'
+              ? payload.detail
+              : `Failed to delete crawl job (${res.status})`
+          throw new Error(detail)
+        }
+        setJobs((prev) => prev.filter((job) => job.id !== jobId))
+        setResults((prev) => {
+          const { [jobId]: _removed, ...rest } = prev
+          return rest
+        })
+        if (selectedJobId === jobId) {
+          setSelectedJobId(null)
+        }
+        await fetchJobs()
+      } catch (err: any) {
+        const message = err?.message ?? 'Failed to delete crawl job'
+        setError(message)
+      } finally {
+        setDeletingId(null)
+      }
+    },
+    [csrfToken, fetchJobs, selectedJobId],
+  )
+
   return (
     <section className="rounded-2xl bg-white/90 p-6 shadow">
       <header className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -288,19 +336,31 @@ export default function CrawlJobs({ namespaceId, csrfToken }: CrawlJobsProps) {
                   <td className="px-3 py-3 text-sm text-gray-600">{job.skippedCount}</td>
                   <td className="px-3 py-3 text-sm text-gray-600">{formatter.format(new Date(updated))}</td>
                   <td className="px-3 py-3">
-                    <button
-                      type="button"
-                      className="rounded-full border border-blue-300 px-3 py-1 text-xs font-medium text-blue-600 transition hover:bg-blue-600 hover:text-white disabled:opacity-50"
-                      onClick={() => {
-                        setSelectedJobId(job.id)
-                        if (!results[job.id]) {
-                          void fetchDetails(job.id)
-                        }
-                      }}
-                      disabled={detailsLoading && selectedJobId === job.id}
-                    >
-                      View
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="rounded-full border border-blue-300 px-3 py-1 text-xs font-medium text-blue-600 transition hover:bg-blue-600 hover:text-white disabled:opacity-50"
+                        onClick={() => {
+                          setSelectedJobId(job.id)
+                          if (!results[job.id]) {
+                            void fetchDetails(job.id)
+                          }
+                        }}
+                        disabled={detailsLoading && selectedJobId === job.id}
+                      >
+                        View
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-full border border-red-300 px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-600 hover:text-white disabled:opacity-50"
+                        onClick={() => {
+                          void handleDelete(job.id)
+                        }}
+                        disabled={deletingId === job.id}
+                      >
+                        {deletingId === job.id ? 'Deleting…' : 'Delete'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )

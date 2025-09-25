@@ -1,22 +1,26 @@
 """Crawl management endpoints."""
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field, HttpUrl
-from sqlalchemy import Select, case, func, select
+from sqlalchemy import Select, case, delete, func, select
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
 from ..core.db import get_session
 from ..core.rate_limiter import limiter
 from ..models import CrawlResult, Job, NamespaceMember
+from ..workers.celery_app import celery_app
 from ..workers.tasks import crawl_site
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 
 class CrawlStartRequest(BaseModel):
@@ -86,7 +90,10 @@ async def start_crawl(
     session.add(job)
     session.flush()
 
-    crawl_site.delay(str(job.id))
+    task = crawl_site.delay(str(job.id))
+    task_id = getattr(task, "id", None)
+    if task_id:
+        job.payload = {"url": str(payload.url), "depth": payload.depth, "task_id": str(task_id)}
 
     return CrawlStartResponse(job_id=job.id)
 
@@ -145,6 +152,35 @@ async def get_crawl_job(
     results = session.execute(results_stmt).scalars().all()
 
     return CrawlJobDetailResponse(job=summary, results=[_to_result_record(item) for item in results])
+
+
+@router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a crawl job")
+async def delete_crawl_job(
+    job_id: uuid.UUID,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> Response:
+    """Delete a crawl job and revoke its worker task if applicable."""
+
+    user_id = _require_user_id(request)
+
+    job = session.get(Job, job_id)
+    if job is None or job.task_type != "crawl":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    _assert_namespace_membership(session, job.namespace_id, user_id)
+
+    payload = job.payload or {}
+    task_id = payload.get("task_id")
+    if task_id:
+        try:
+            celery_app.control.revoke(str(task_id), terminate=True)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning("Failed to revoke crawl task %s: %s", task_id, exc)
+
+    session.execute(delete(CrawlResult).where(CrawlResult.job_id == job_id))
+    session.delete(job)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _build_job_query() -> Select[Any]:

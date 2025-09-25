@@ -5,6 +5,7 @@ import json
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
+from types import SimpleNamespace
 import sys
 
 import itsdangerous
@@ -188,8 +189,9 @@ def crawl_calls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     calls: list[str] = []
 
     class _Task:
-        def delay(self, job_id: str) -> None:
+        def delay(self, job_id: str) -> SimpleNamespace:
             calls.append(job_id)
+            return SimpleNamespace(id=f"task-{job_id}")
 
     monkeypatch.setattr(tasks_module, "crawl_site", _Task())
     return calls
