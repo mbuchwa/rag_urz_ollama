@@ -478,7 +478,7 @@ export default function Home() {
           {!hasConversation && (
             <section className="mb-4 w-full">
               <div className="mx-auto max-w-2xl rounded-2xl bg-white/85 p-6 shadow-lg backdrop-blur">
-                <div className="mb-4 text-center text-lg font-bold text-gray-600">Modell: gpt-oss-20b</div>
+                <div className="mb-4 text-center text-lg font-bold text-gray-600">Modell: gemma3:27b</div>
                 <div className="mb-3 flex items-center gap-2 text-gray-500">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-yellow-500">
                     <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />

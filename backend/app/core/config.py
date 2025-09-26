@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     LOCAL_LOGIN_PASSWORD: str = Field(default="testtest")
 
     OLLAMA_HOST: str = Field(default="http://host.docker.internal:11434")
-    OLLAMA_MODEL: str = Field(default="gpt-oss-20b")
+    OLLAMA_MODEL: str = Field(default="gemma3:27b")
     OLLAMA_TIMEOUT: float = Field(default=120.0)
 
     CHAT_HISTORY_LIMIT: int = Field(default=12)
