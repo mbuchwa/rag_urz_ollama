@@ -145,9 +145,11 @@ class PatchedOllama(Ollama):
             model_name=self.model,
         )
 
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
+
 Settings.llm = PatchedOllama(
-    model="gpt-oss:20b",
-    base_url="http://localhost:11434",
+    model="gemma3:27b",
+    base_url=OLLAMA_BASE_URL,
     temperature=0.2,
     system_prompt=SYSTEM_PROMPT,
     additional_kwargs={"num_predict": 1024, "num_ctx": 8192},
