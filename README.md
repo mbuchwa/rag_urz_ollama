@@ -75,7 +75,8 @@ The command starts the following services:
 > **Note**
 > Start `ollama serve` (or ensure another Ollama daemon is listening on port 11434) on the
 > host machine before launching Docker Compose. The containers reach it through
-> `http://host.docker.internal:11434`.
+> `http://host.docker.internal:11434`. When you run the API outside Docker, set
+> `OLLAMA_HOST` and `OLLAMA_FALLBACK_HOST` to the addresses that can reach your Ollama runtime.
 
 ### 4. Smoke Test
 
@@ -109,6 +110,7 @@ The following values are the most important when running locally:
 | `OIDC_ISSUER` | Base URL for the OpenID provider | `https://keycloak.local/realms/rag` |
 | `OIDC_REDIRECT_URI` | Backend callback URL | `http://localhost:8000/auth/callback` |
 | `FRONTEND_URL` | Origin used for CORS + redirects | `http://localhost:3000` |
+| `OLLAMA_HOST` / `OLLAMA_FALLBACK_HOST` | Primary + fallback base URLs for the Ollama API | `http://host.docker.internal:11434` / `http://127.0.0.1:11434` |
 | `SESSION_SECRET` | Cookie signing key (keep unique per deployment) | `generate-with-openssl` |
 | `SESSION_COOKIE_SECURE` | Set `false` for plain HTTP dev stacks | `false` |
 | `UPLOAD_MAX_BYTES` | Maximum accepted upload size | `26214400` |
