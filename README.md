@@ -70,12 +70,12 @@ The command starts the following services:
 | `worker`   | Celery worker for async tasks          | n/a  |
 | `db`       | PostgreSQL 16 with pgvector extension  | 5432 |
 | `redis`    | Redis message broker / cache           | 6379 |
-| `ollama`   | Local Ollama runtime with model cache  | 11434 (configurable) |
+| `ollama`   | Local Ollama runtime with model cache  | 11435 (configurable) |
 | `minio`    | S3-compatible object storage           | 9000 (API), 9001 (console) |
 
 > **Note**
 > The Ollama container keeps models under the `ollama-data` named volume. If the default host
-> port (`11434`) is taken, set `OLLAMA_HOST_PORT` in your `.env` file before starting the stack.
+> port (`11435`) is taken, set `OLLAMA_HOST_PORT` in your `.env` file before starting the stack.
 > Before chatting for the first time, pull the model configured in `OLLAMA_MODEL` (defaults to
 > `gemma3:27b`) via `docker compose exec ollama ollama pull gemma3:27b`. Adjust the model name to
 > match your configuration. When you run the API outside Docker, set `OLLAMA_HOST` to the address
@@ -114,7 +114,7 @@ The following values are the most important when running locally:
 | `OIDC_REDIRECT_URI` | Backend callback URL | `http://localhost:8000/auth/callback` |
 | `FRONTEND_URL` | Origin used for CORS + redirects | `http://localhost:3000` |
 | `OLLAMA_HOST` / `OLLAMA_FALLBACK_HOST` | Base URLs for the Ollama API                     | `http://ollama:11434` / _(leave empty for no fallback)_ |
-| `OLLAMA_HOST_PORT` | Host port that exposes the Ollama container | `11434` |
+| `OLLAMA_HOST_PORT` | Host port that exposes the Ollama container | `11435` |
 | `SESSION_SECRET` | Cookie signing key (keep unique per deployment) | `generate-with-openssl` |
 | `SESSION_COOKIE_SECURE` | Set `false` for plain HTTP dev stacks | `false` |
 | `UPLOAD_MAX_BYTES` | Maximum accepted upload size | `26214400` |
