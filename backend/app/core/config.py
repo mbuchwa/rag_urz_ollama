@@ -45,8 +45,8 @@ class Settings(BaseSettings):
     LOCAL_LOGIN_EMAIL: str = Field(default="test@uni-heidelberg.de")
     LOCAL_LOGIN_PASSWORD: str = Field(default="testtest")
 
-    OLLAMA_HOST: str = Field(default="http://host.docker.internal:11434")
-    OLLAMA_FALLBACK_HOST: str = Field(default="http://127.0.0.1:11434")
+    OLLAMA_HOST: str = Field(default="http://ollama:11434")
+    OLLAMA_FALLBACK_HOST: str | None = Field(default=None)
     OLLAMA_MODEL: str = Field(default="gemma3:27b")
     OLLAMA_TIMEOUT: float = Field(default=120.0)
 
