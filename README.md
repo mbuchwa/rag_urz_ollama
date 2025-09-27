@@ -47,7 +47,7 @@ cp .env.example .env
 ```
 
 The defaults target local containers: PostgreSQL with the pgvector extension, Redis, MinIO,
-and expect an Ollama runtime to be available on the Docker host.
+and an Ollama runtime that runs as part of the Docker Compose stack.
 
 ### 2. Build Images
 
@@ -70,13 +70,15 @@ The command starts the following services:
 | `worker`   | Celery worker for async tasks          | n/a  |
 | `db`       | PostgreSQL 16 with pgvector extension  | 5432 |
 | `redis`    | Redis message broker / cache           | 6379 |
+| `ollama`   | Local Ollama runtime with model cache  | 11434 |
 | `minio`    | S3-compatible object storage           | 9000 (API), 9001 (console) |
 
 > **Note**
-> Start `ollama serve` (or ensure another Ollama daemon is listening on port 11434) on the
-> host machine before launching Docker Compose. The containers reach it through
-> `http://host.docker.internal:11434`. When you run the API outside Docker, set
-> `OLLAMA_HOST` and `OLLAMA_FALLBACK_HOST` to the addresses that can reach your Ollama runtime.
+> The Ollama container keeps models under the `ollama-data` named volume. Before chatting for
+> the first time, pull the model configured in `OLLAMA_MODEL` (defaults to `gemma3:27b`) via
+> `docker compose exec ollama ollama pull gemma3:27b`. Adjust the model name to match your
+> configuration. When you run the API outside Docker, set `OLLAMA_HOST` to the address that can
+> reach your Ollama runtime.
 
 ### 4. Smoke Test
 
@@ -110,7 +112,7 @@ The following values are the most important when running locally:
 | `OIDC_ISSUER` | Base URL for the OpenID provider | `https://keycloak.local/realms/rag` |
 | `OIDC_REDIRECT_URI` | Backend callback URL | `http://localhost:8000/auth/callback` |
 | `FRONTEND_URL` | Origin used for CORS + redirects | `http://localhost:3000` |
-| `OLLAMA_HOST` / `OLLAMA_FALLBACK_HOST` | Primary + fallback base URLs for the Ollama API | `http://host.docker.internal:11434` / `http://127.0.0.1:11434` |
+| `OLLAMA_HOST` / `OLLAMA_FALLBACK_HOST` | Base URLs for the Ollama API                     | `http://ollama:11434` / _(leave empty for no fallback)_ |
 | `SESSION_SECRET` | Cookie signing key (keep unique per deployment) | `generate-with-openssl` |
 | `SESSION_COOKIE_SECURE` | Set `false` for plain HTTP dev stacks | `false` |
 | `UPLOAD_MAX_BYTES` | Maximum accepted upload size | `26214400` |

@@ -145,7 +145,7 @@ class PatchedOllama(Ollama):
             model_name=self.model,
         )
 
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
 
 Settings.llm = PatchedOllama(
     model="gemma3:27b",

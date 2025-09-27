@@ -6,12 +6,11 @@ services:
     env_file: .env
     ports:
       - "8000:8000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       - db
       - redis
       - minio
+      - ollama
     volumes:
       - ./:/app
 
@@ -27,8 +26,7 @@ services:
       - db
       - redis
       - minio
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - ollama
     volumes:
       - ./:/app
 
@@ -59,6 +57,13 @@ services:
     ports:
       - "6379:6379"
 
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
   minio:
     image: minio/minio:RELEASE.2024-08-03T04-33-23Z
     environment:
@@ -74,3 +79,4 @@ services:
 volumes:
   pgdata:
   minio-data:
+  ollama-data:
