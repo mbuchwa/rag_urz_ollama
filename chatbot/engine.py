@@ -152,7 +152,7 @@ Settings.llm = PatchedOllama(
     base_url=OLLAMA_BASE_URL,
     temperature=0.2,
     system_prompt=SYSTEM_PROMPT,
-    additional_kwargs={"num_predict": 1024, "num_ctx": 8192},
+    additional_kwargs={"num_predict": 1024, "num_ctx": 2048},
 )
 
 logger = logging.getLogger(__name__)
