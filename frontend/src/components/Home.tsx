@@ -207,85 +207,107 @@ export default function Home() {
         let citations: Citation[] = []
         let hadError = false
 
+        const processFrame = (rawFrame: string) => {
+          const lines = rawFrame
+            .split(/\r?\n/)
+            .map((line) => line.trimEnd())
+            .filter(Boolean)
+
+          const dataPayload = lines
+            .filter((line) => line.startsWith('data:'))
+            .map((line) => line.slice(5).trimStart())
+            .join('\n')
+
+          if (!dataPayload) {
+            return
+          }
+
+          let payload: any
+          try {
+            payload = JSON.parse(dataPayload)
+          } catch (error) {
+            console.warn('Failed to parse chat frame', error)
+            return
+          }
+
+          if (typeof payload.token === 'string') {
+            answer += payload.token
+            setMessages((m) => {
+              const arr = [...m]
+              const last = arr[arr.length - 1]
+              if (last && last.sender === 'bot') {
+                arr[arr.length - 1] = { ...last, text: answer }
+              }
+              return arr
+            })
+          }
+
+          if (Array.isArray(payload.citations)) {
+            citations = payload.citations
+              .map((c: any): Citation | null => {
+                if (!c || typeof c.doc_id !== 'string') return null
+                return {
+                  docId: c.doc_id,
+                  ord: Number(c.ord) || 0,
+                  title: typeof c.title === 'string' ? c.title : null,
+                  chunkId: typeof c.chunk_id === 'string' ? c.chunk_id : null,
+                  text: typeof c.text === 'string' ? c.text : null,
+                }
+              })
+              .filter((c: Citation | null): c is Citation => Boolean(c))
+            setMessages((m) => {
+              const arr = [...m]
+              const last = arr[arr.length - 1]
+              if (last && last.sender === 'bot') {
+                arr[arr.length - 1] = { ...last, citations }
+              }
+              return arr
+            })
+          }
+
+          if (payload.error) {
+            live = false
+            citations = []
+            hadError = true
+            setMessages((m) => {
+              const arr = [...m]
+              const last = arr[arr.length - 1]
+              if (last && last.sender === 'bot') {
+                arr[arr.length - 1] = {
+                  ...last,
+                  text: 'The assistant could not generate a response.',
+                  citations: [],
+                }
+              }
+              return arr
+            })
+            return
+          }
+
+          if (payload.done) {
+            live = false
+          }
+        }
+
         while (live) {
           const { value, done } = await reader.read()
           if (done) break
 
           buffer += decoder.decode(value, { stream: true })
-          let idx: number
-          while ((idx = buffer.indexOf('\n\n')) !== -1) {
-            const frame = buffer.slice(0, idx).trim()
-            buffer = buffer.slice(idx + 2)
-            if (!frame.startsWith('data:')) continue
-            const raw = frame.slice(5).trim()
-            if (!raw) continue
-            let payload: any
-            try {
-              payload = JSON.parse(raw)
-            } catch (error) {
-              console.warn('Failed to parse chat frame', error)
-              continue
-            }
 
-            if (typeof payload.token === 'string') {
-              answer += payload.token
-              setMessages((m) => {
-                const arr = [...m]
-                const last = arr[arr.length - 1]
-                if (last && last.sender === 'bot') {
-                  arr[arr.length - 1] = { ...last, text: answer }
-                }
-                return arr
-              })
-            }
+          while (true) {
+            const delimiterMatch = buffer.match(/\r?\n\r?\n/)
+            if (!delimiterMatch || delimiterMatch.index == null) break
 
-            if (Array.isArray(payload.citations)) {
-              citations = payload.citations
-                .map((c: any): Citation | null => {
-                  if (!c || typeof c.doc_id !== 'string') return null
-                  return {
-                    docId: c.doc_id,
-                    ord: Number(c.ord) || 0,
-                    title: typeof c.title === 'string' ? c.title : null,
-                    chunkId: typeof c.chunk_id === 'string' ? c.chunk_id : null,
-                    text: typeof c.text === 'string' ? c.text : null,
-                  }
-                })
-                .filter((c: Citation | null): c is Citation => Boolean(c))
-              setMessages((m) => {
-                const arr = [...m]
-                const last = arr[arr.length - 1]
-                if (last && last.sender === 'bot') {
-                  arr[arr.length - 1] = { ...last, citations }
-                }
-                return arr
-              })
-            }
-
-            if (payload.error) {
-              live = false
-              citations = []
-              hadError = true
-              setMessages((m) => {
-                const arr = [...m]
-                const last = arr[arr.length - 1]
-                if (last && last.sender === 'bot') {
-                  arr[arr.length - 1] = {
-                    ...last,
-                    text: 'The assistant could not generate a response.',
-                    citations: [],
-                  }
-                }
-                return arr
-              })
-              break
-            }
-
-            if (payload.done) {
-              live = false
-              break
-            }
+            const frame = buffer.slice(0, delimiterMatch.index)
+            buffer = buffer.slice(delimiterMatch.index + delimiterMatch[0].length)
+            processFrame(frame)
+            if (!live) break
           }
+        }
+
+        if (buffer.trim()) {
+          processFrame(buffer)
         }
 
         try {
