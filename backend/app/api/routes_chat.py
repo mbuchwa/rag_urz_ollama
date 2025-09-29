@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Dict, Iterable, List
@@ -16,7 +17,8 @@ from sqlalchemy.orm import Session
 from ..core.config import settings
 from ..core.db import SessionLocal, get_session
 from ..core.rate_limiter import limiter
-from ..models import Conversation, Message, NamespaceMember
+from ..models import Conversation, Document, Message, NamespaceMember
+from ..models.documents import DocumentStatus
 from ..rag import ollama_client, retrieval
 
 logger = logging.getLogger(__name__)
@@ -28,6 +30,16 @@ SYSTEM_PROMPT = (
     "Use only the provided knowledge base excerpts to answer user questions. "
     "If the answer is not contained in the context, reply that you do not know. "
     "When you reference information from a context snippet include a footnote marker in the form [^N] where N matches the source number."
+)
+
+_GERMAN_HINT = re.compile(r"[äöüß]|\b(der|die|das|und|ist|nicht|wie|wo|sie|ich)\b", re.IGNORECASE)
+_FALLBACK_REPLY_EN = (
+    "I’m sorry, I couldn’t find any relevant information in the knowledge base yet. "
+    "Please upload supporting material or try a different question."
+)
+_FALLBACK_REPLY_DE = (
+    "Es tut mir leid, ich konnte in der Wissensbibliothek keine passenden Informationen finden. "
+    "Bitte laden Sie relevante Unterlagen hoch oder formulieren Sie Ihre Frage anders."
 )
 
 
@@ -144,6 +156,14 @@ def _sse_payload(data: Dict[str, Any]) -> str:
     return f"data: {json.dumps(data, default=str)}\n\n"
 
 
+def _is_probably_german(text: str) -> bool:
+    return bool(_GERMAN_HINT.search(text or ""))
+
+
+def _fallback_reply(user_input: str) -> str:
+    return _FALLBACK_REPLY_DE if _is_probably_german(user_input) else _FALLBACK_REPLY_EN
+
+
 @router.get("/stream", summary="Stream chat completions over SSE")
 @limiter.limit(settings.RATE_LIMIT_CHAT_STREAM)
 async def chat_stream(
@@ -160,6 +180,7 @@ async def chat_stream(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty query")
 
     session = SessionLocal()
+    has_library_content = False
     try:
         conversation = session.get(Conversation, conversation_id)
         if conversation is None or conversation.namespace_id != namespace_id:
@@ -170,6 +191,17 @@ async def chat_stream(
         _assert_namespace_membership(session, namespace_id, user_id)
 
         history = _load_recent_messages(session, conversation_id)
+
+        doc_exists_stmt: Select[Any] = (
+            select(Document.id)
+            .where(
+                Document.namespace_id == namespace_id,
+                Document.status == DocumentStatus.INGESTED.value,
+                Document.deleted_at.is_(None),
+            )
+            .limit(1)
+        )
+        has_library_content = session.execute(doc_exists_stmt).scalar_one_or_none() is not None
 
         retrieved_chunks = retrieval.retrieve(question, namespace_id, session=session)
         context, citations = _build_context(retrieved_chunks)
@@ -199,7 +231,35 @@ async def chat_stream(
         ]
     )
 
+    def persist_assistant_message(response_text: str, response_citations: List[_CitationPayload]) -> None:
+        clean_text = response_text.strip()
+        if not clean_text:
+            clean_text = response_text
+        with SessionLocal() as write_session:
+            conversation = write_session.get(Conversation, conversation_id)
+            if conversation is None:
+                return
+            conversation.updated_at = datetime.now(timezone.utc)
+            assistant_message = Message(
+                conversation_id=conversation.id,
+                user_id=None,
+                role="assistant",
+                content=clean_text,
+            )
+            assistant_message.metadata_dict = {
+                "citations": [citation.model_dump() for citation in response_citations]
+            }
+            write_session.add(assistant_message)
+            write_session.commit()
+
     async def event_stream() -> AsyncIterator[str]:
+        if not retrieved_chunks and not has_library_content:
+            fallback = _fallback_reply(question)
+            yield _sse_payload({"token": fallback})
+            yield _sse_payload({"done": True, "citations": []})
+            persist_assistant_message(fallback, [])
+            return
+
         assistant_reply: List[str] = []
         try:
             async for chunk in ollama_client.stream_generate(prompt):
@@ -221,22 +281,7 @@ async def chat_stream(
         yield _sse_payload(payload)
 
         response_text = "".join(assistant_reply).strip()
-        with SessionLocal() as write_session:
-            conversation = write_session.get(Conversation, conversation_id)
-            if conversation is None:
-                return
-            conversation.updated_at = datetime.now(timezone.utc)
-            assistant_message = Message(
-                conversation_id=conversation.id,
-                user_id=None,
-                role="assistant",
-                content=response_text,
-            )
-            assistant_message.metadata_dict = {
-                "citations": [citation.model_dump() for citation in citations]
-            }
-            write_session.add(assistant_message)
-            write_session.commit()
+        persist_assistant_message(response_text, citations)
 
     headers = {
         "Cache-Control": "no-cache",
