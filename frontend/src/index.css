@@ -46,21 +46,20 @@ body::before {
 }
 
 .sidebar-overlay {
-  position: absolute;
-  top: 0;
-  left: calc(100% + 1.5rem);
-  width: clamp(260px, 26vw, 320px);
+  position: fixed;
+  top: 12vh;
+  right: clamp(1.5rem, 4vw, 3rem);
+  left: auto;
+  width: clamp(260px, 26vw, 340px);
+  max-width: 360px;
   z-index: 30;
   display: flex;
   justify-content: flex-start;
 }
 
-@media (max-width: 1400px) {
+@media (max-width: 1200px) {
   .sidebar-overlay {
-    position: fixed;
-    top: 12vh;
     right: min(2rem, 5vw);
-    left: auto;
     width: min(90vw, 360px);
   }
 }
