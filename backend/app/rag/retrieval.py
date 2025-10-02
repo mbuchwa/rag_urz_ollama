@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import uuid
 from dataclasses import dataclass
 from typing import List, Sequence
@@ -107,4 +108,23 @@ def retrieve(
         except Exception:  # pragma: no cover - safety net
             logger.exception("Reranker failed; falling back to ANN ordering")
 
-    return results[:target_top_k]
+    top_results = results[:target_top_k]
+    if not top_results:
+        return []
+
+    def similarity(distance: float) -> float:
+        if not math.isfinite(distance):
+            return 0.0
+        # cosine_distance = 1 - cosine_similarity -> invert and clamp for stability
+        return max(min(1.0 - distance, 1.0), -1.0)
+
+    threshold = settings.RETRIEVAL_RELEVANCE_THRESHOLD
+    relevant = [chunk for chunk in top_results if similarity(chunk.score) >= threshold]
+
+    if len(relevant) > 3:
+        return relevant
+    if relevant:
+        return relevant
+
+    # If nothing met the threshold, fall back to the strongest few results for transparency
+    return top_results[: min(len(top_results), 3)]
