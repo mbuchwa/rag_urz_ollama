@@ -112,12 +112,82 @@ class PatchedOllama(Ollama):
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
 
+# ---- Ollama runtime tuning ------------------------------------------------- #
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        value = os.getenv(name)
+        return int(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        value = os.getenv(name)
+        return float(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:27b")
+OLLAMA_TEMPERATURE = _env_float("OLLAMA_TEMPERATURE", 0.2)
+OLLAMA_NUM_PREDICT = _env_int("OLLAMA_NUM_PREDICT", 512)
+OLLAMA_NUM_CTX = _env_int("OLLAMA_NUM_CTX", 2048)
+OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "5m")
+
+ollama_options = {}
+
+_num_gpu = os.getenv("OLLAMA_NUM_GPU")
+if _num_gpu is not None:
+    try:
+        ollama_options["num_gpu"] = int(_num_gpu)
+    except ValueError:
+        logger.warning("Invalid OLLAMA_NUM_GPU=%s (expected int)", _num_gpu)
+
+_main_gpu = os.getenv("OLLAMA_MAIN_GPU")
+if _main_gpu is not None:
+    try:
+        ollama_options["main_gpu"] = int(_main_gpu)
+    except ValueError:
+        logger.warning("Invalid OLLAMA_MAIN_GPU=%s (expected int)", _main_gpu)
+
+_num_thread = os.getenv("OLLAMA_NUM_THREAD")
+if _num_thread is not None:
+    try:
+        ollama_options["num_thread"] = int(_num_thread)
+    except ValueError:
+        logger.warning("Invalid OLLAMA_NUM_THREAD=%s (expected int)", _num_thread)
+
+_num_batch = os.getenv("OLLAMA_NUM_BATCH")
+if _num_batch is not None:
+    try:
+        ollama_options["num_batch"] = int(_num_batch)
+    except ValueError:
+        logger.warning("Invalid OLLAMA_NUM_BATCH=%s (expected int)", _num_batch)
+
+for flag in ("use_mmap", "use_mlock", "low_vram"):
+    env_name = f"OLLAMA_{flag.upper()}"
+    val = os.getenv(env_name)
+    if val is not None:
+        if val.lower() in {"1", "true", "yes", "on"}:
+            ollama_options[flag] = True
+        elif val.lower() in {"0", "false", "no", "off"}:
+            ollama_options[flag] = False
+        else:
+            logger.warning("Invalid %s=%s (expected boolean)", env_name, val)
+
+additional_kwargs = {"num_predict": OLLAMA_NUM_PREDICT, "num_ctx": OLLAMA_NUM_CTX}
+if ollama_options:
+    additional_kwargs["options"] = ollama_options
+
 Settings.llm = PatchedOllama(
-    model="gemma3:27b",
+    model=OLLAMA_MODEL,
     base_url=OLLAMA_BASE_URL,
-    temperature=0.2,
+    temperature=OLLAMA_TEMPERATURE,
     system_prompt=SYSTEM_PROMPT,
-    additional_kwargs={"num_predict": 512, "num_ctx": 2048},
+    additional_kwargs=additional_kwargs,
+    keep_alive=OLLAMA_KEEP_ALIVE,
 )
 
 logger = logging.getLogger(__name__)
@@ -141,6 +211,16 @@ rerank_model = CrossEncoder(
     max_length=512,
     device=DEVICE,
 )
+
+if DEVICE == "cuda":
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+
+    if os.getenv("RERANKER_FP16", "1").lower() not in {"0", "false", "no"}:
+        try:
+            rerank_model.model.half()
+        except AttributeError:
+            logger.debug("Cross-encoder model does not support half precision")
 
 # Serialize cross-encoder calls across threads to avoid GPU/torch races
 _RERANK_LOCK = threading.Lock()

@@ -175,6 +175,25 @@ per organisation.
 - **Metrics** – Prometheus can scrape `http://localhost:8000/admin/metrics` for request/task metrics.
   `curl -H 'Accept: text/plain' http://localhost:8000/admin/metrics | head` to inspect locally.
 
+### Ollama & Reranker performance tuning
+
+The legacy Flask stack now exposes several knobs to keep large models responsive—especially when you
+run a 27B parameter model on a single GPU:
+
+| Variable | Purpose |
+|----------|---------|
+| `OLLAMA_MODEL` | Override the model tag without touching the code. |
+| `OLLAMA_NUM_GPU` / `OLLAMA_MAIN_GPU` | Constrain Ollama to a specific number/index of GPUs. Set `1`/`0` to keep everything on a single card. |
+| `OLLAMA_NUM_THREAD` / `OLLAMA_NUM_BATCH` | Tune CPU threads and batching for prompt processing. |
+| `OLLAMA_NUM_CTX` / `OLLAMA_NUM_PREDICT` | Reduce generated tokens or context window to lower latency. |
+| `OLLAMA_KEEP_ALIVE` | Keep the model loaded between requests (e.g. `5m` or `-1`). |
+| `OLLAMA_USE_MMAP` / `OLLAMA_USE_MLOCK` / `OLLAMA_LOW_VRAM` | Toggle memory optimisations supported by Ollama. |
+| `RERANKER_FP16` | Defaults to `1`. Set to `0` to disable half-precision inference for the BGE reranker if you encounter accuracy issues. |
+
+With these defaults the reranker runs in FP16 on CUDA devices and the CUDA backend enables TF32
+matrix kernels, which shortens the scoring step without sacrificing quality. Combine the environment
+settings to cap Ollama at a single GPU while still benefiting from GPU-accelerated inference.
+
 ## Next Steps
 
 The backend scaffold contains placeholders for authentication, ingestion pipelines, Celery tasks,
