@@ -114,6 +114,18 @@ cd backend
 pytest
 ```
 
+### 6. Stop the docker services
+
+To stop and remove the docker services:
+
+```bash
+docker ps -q --filter "name=^rag_urz_ollama" | xargs -r docker stop
+```
+
+```bash
+docker ps -aq --filter "name=^rag_urz_ollama" | xargs -r docker rm
+```
+
 ## Environment Configuration
 
 The application reads configuration from environment variables (see `backend/app/core/config.py`).
