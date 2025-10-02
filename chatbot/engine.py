@@ -238,16 +238,6 @@ INSUFFICIENT_PATTERNS = [
     "dazu finde ich in den unterlagen nichts",
 ]
 
-USE_DOMAIN_KEYWORD_GATE = False
-DOMAIN_KEYWORDS = [
-    "heichat","eduroam","vpn","moodle","uni-id","heibox","shibboleth","idm",
-    "exchange","outlook","mail","e-mail","email","druck","drucker","printing",
-    "lizenz","license","software","matlab","microsoft","wolfram","zoom","cloud",
-    "backup","storage","netz","wlan","wifi","netzkonto","passwort","password",
-    "service","support","helpdesk","ticket","sso","mfa","2fa","totp",
-    "campus","hispos","sap","gitlab"
-]
-
 # --------------------------------------------------------------------------- #
 #                          Conversation & Chat History                        #
 # --------------------------------------------------------------------------- #
@@ -393,8 +383,6 @@ def _looks_like_meta_or_oos(query: str, answer: str) -> bool:
     if any(t in q for t in META_TRIGGERS):
         return True
     if any(p in a for p in INSUFFICIENT_PATTERNS):
-        return True
-    if USE_DOMAIN_KEYWORD_GATE and not any(k in q for k in DOMAIN_KEYWORDS):
         return True
     return False
 
