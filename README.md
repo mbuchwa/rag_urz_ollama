@@ -61,6 +61,18 @@ docker compose build
 docker compose up
 ```
 
+To directly build and compose:
+
+```bash
+ docker compose up -d --build
+```
+
+To recreate the docker services:
+
+```bash
+docker compose up -d --force-recreate
+```
+
 The command starts the following services:
 
 | Service    | Description                            | Port |
