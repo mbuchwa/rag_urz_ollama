@@ -32,7 +32,7 @@ export default function QueryInterface({
   return (
     <form
       onSubmit={submit}
-      className="flex gap-2 mt-auto p-4 bg-white border-t rounded-b"
+      className="mt-auto flex w-full gap-2 rounded-b border-t bg-white p-4"
       aria-label="Query interface"
     >
       <div className="relative flex-1">
