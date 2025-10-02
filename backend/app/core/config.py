@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     RETRIEVAL_TOP_K: int = Field(default=5)
     RETRIEVAL_USE_RERANKER: bool = Field(default=False)
     RERANKER_CANDIDATE_MULTIPLIER: int = Field(default=3)
+    RETRIEVAL_RELEVANCE_THRESHOLD: float = Field(default=0.55)
 
     OIDC_CLIENT_ID: str = Field(default="client-id")
     OIDC_CLIENT_SECRET: str = Field(default="client-secret")

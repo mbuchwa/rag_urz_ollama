@@ -24,14 +24,12 @@ body::before {
 
 /* Layout for collapsible thinking sidebar */
 .chat-container {
-  display: grid;
-  grid-template-columns: 1fr;
-  transition: grid-template-columns 0.3s ease-in-out;
   position: relative;
+  width: 100%;
 }
 
 .sidebar-open {
-  grid-template-columns: 1fr 300px;
+  /* keep hook for JS while layout is controlled via overlay */
 }
 
 .chat-panel {
@@ -42,7 +40,37 @@ body::before {
   background: #f3f3f3;
   padding: 1rem;
   overflow-y: auto;
-  border-left: 1px solid #ccc;
+  border-left: 1px solid #d1d5db;
+  border-radius: 0.75rem;
+  box-shadow: -6px 0 18px rgba(15, 23, 42, 0.1);
+}
+
+.sidebar-overlay {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 1.5rem);
+  width: clamp(260px, 26vw, 320px);
+  z-index: 30;
+  display: flex;
+  justify-content: flex-start;
+}
+
+@media (max-width: 1400px) {
+  .sidebar-overlay {
+    position: fixed;
+    top: 12vh;
+    right: min(2rem, 5vw);
+    left: auto;
+    width: min(90vw, 360px);
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar-overlay {
+    top: 8vh;
+    right: 1rem;
+    width: calc(100% - 2rem);
+  }
 }
 
 /* Chat markdown styling */
