@@ -8,19 +8,23 @@ type Props = {
 export default function SourceSidebar({ citation, onClose }: Props) {
   const ordinal = Number.isFinite(citation.ord) ? citation.ord + 1 : citation.ord
   return (
-    <aside className="sidebar-overlay" role="complementary" aria-label="Source details">
-      <div className="sidebar h-[70vh] flex flex-col">
-        <div className="mb-3 flex items-center justify-between">
+    <section
+      className="mt-6 w-full"
+      role="complementary"
+      aria-label="Source details"
+    >
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-lg font-semibold text-gray-800">Source Details</h3>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full bg-gray-200 px-3 py-1 text-sm text-gray-700 hover:bg-gray-300"
+            className="rounded-full bg-gray-200 px-3 py-1 text-sm text-gray-700 transition hover:bg-gray-300"
           >
             Close
           </button>
         </div>
-        <div className="space-y-2 text-sm text-gray-700">
+        <div className="space-y-3 text-sm text-gray-700">
           <div>
             <span className="font-semibold text-gray-900">Title:</span>{' '}
             <span>{citation.title || 'Untitled document'}</span>
@@ -37,11 +41,11 @@ export default function SourceSidebar({ citation, onClose }: Props) {
           )}
         </div>
         {citation.text && (
-          <div className="mt-4 flex-1 overflow-y-auto rounded-lg bg-white p-4 text-sm shadow-inner">
+          <div className="mt-5 max-h-80 overflow-y-auto rounded-xl bg-gray-50 p-4 text-sm">
             <pre className="whitespace-pre-wrap font-sans text-gray-800">{citation.text}</pre>
           </div>
         )}
       </div>
-    </aside>
+    </section>
   )
 }
